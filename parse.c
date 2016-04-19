@@ -223,6 +223,6 @@ int main(int argc, char** argv) {
     }
 
     // undefine and delete parsers
-    mpc_cleanup(4, Number, Symbol, Sexpr, Expr, Slither);
+    mpc_cleanup(5, Number, Symbol, Sexpr, Expr, Slither);
     return 0;
 }

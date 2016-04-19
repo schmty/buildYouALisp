@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
             Number, Operator, Expr, Slither);
 
     /* Print version and exit info */
-    puts("Slither version 0.0.3");
+    puts("Slither version 0.0.4");
     puts("Press ctrl+c to exit\n");
 
     // in a never ending loop

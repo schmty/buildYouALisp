@@ -9,7 +9,7 @@
 
 static char buffer[2048];
 
-// fake readline func
+// fake readline func for windows
 char* readline(char* prompt) {
     fputs(prompt, stdout);
     fgets(buffer, 2048, stdin);
@@ -19,7 +19,7 @@ char* readline(char* prompt) {
     return cpy;
 }
 
-// fake add_history function
+// fake add_history function for windows
 void add_history(char* unused) {}
 
 // else include the libs

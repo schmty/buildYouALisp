@@ -302,7 +302,7 @@ int main(int argc, char** argv) {
             Number, Symbol, Sexpr, Expr, Slither);
 
     /* Print version and exit info */
-    puts("Slither version 0.0.5");
+    puts("Slither version 0.0.6");
     puts("Press ctrl+c to exit\n");
 
     // in a never ending loop

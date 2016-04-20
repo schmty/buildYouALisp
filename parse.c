@@ -35,6 +35,10 @@ void add_history(char* unused) {}
     }                                        \
 }
 
+#define EMPTYASSERT(qexpr)\
+    if (qexpr->cell[0]->count == 0) { lval_del(qexpr); return lval_err("Function passed an empty {}."); }
+
+
 // possible lval types enum
 enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR };
 
@@ -267,8 +271,7 @@ lval* builtin_head(lval* a) {
               "Function 'head' passed incorrect ammount of args, 'head' takes 1 arg.");
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
             "Function 'head' passed incorrect type!");
-    LASSERT(a, a->cell[0]->count != 0,
-            "Function 'head' passed {}!");
+    EMPTYASSERT(a);
 
     lval* v = lval_take(a, 0);
 
@@ -282,8 +285,7 @@ lval* builtin_tail(lval* a) {
             "Function 'tail' passed incorrect amount of args! 'tail' takes 1 arg.");
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
             "Function 'tail' passed incorrect type!");
-    LASSERT(a, a->cell[0]->count != 0,
-            "Function 'tail' passed {}!");
+    EMPTYASSERT(a);
     // take the first argument
     // note that this is taking the entire vector and modifying a new version (immutable?)
     // not sure

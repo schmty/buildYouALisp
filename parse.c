@@ -344,6 +344,7 @@ lval* builtin_cons(lval* a) {
     while (a->count) {
         x = lval_join(x, lval_pop(a, 0));
     }
+    lval_del(a);
     return x;
 }
 

@@ -28,6 +28,9 @@ void add_history(char* unused) {}
 
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
+#define IASSERT(args, cond, err) \
+    if (!(cond)) { lval_del(args); return lval_err(err); }
+
 // possible lval types enum
 enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR };
 
@@ -324,7 +327,7 @@ lval* builtin_join(lval* a) {
                 "Function 'join' passed incorrect type!");
     }
 
-    // go over the details of lval_pop and lval_take more
+    // TODO: go over the details of lval_pop and lval_take more
     // need to gain better understanding
     lval* x = lval_pop(a, 0);
     while (a->count) {
@@ -335,7 +338,7 @@ lval* builtin_join(lval* a) {
     return x;
 }
 
-
+// TODO: build a more efficient cons
 lval* builtin_cons(lval* a) {
     LASSERT(a, a->count == 2,
             "Function 'cons' passed to many args!");
@@ -348,6 +351,20 @@ lval* builtin_cons(lval* a) {
     return x;
 }
 
+// should I return an int?
+lval* builtin_len(lval* a) {
+    LASSERT(a, a->type == LVAL_QEXPR,
+            "Function 'len' passed the wrong type!");
+    LASSERT(a, a->count == 1,
+            "Function 'len' passed too many args!");
+    // @TODO: will i need to clean memory for this one? not sure
+    lval* x = lval_num(a->cell[0]->count);
+    // @TODO: should I delete a?
+    // I don't think so because we might still need it?
+    lval_del(a);
+    return x;
+}
+
 lval* builtin(lval* a, char* func) {
     if (strcmp("list", func) == 0) { return builtin_list(a); }
     if (strcmp("head", func) == 0) { return builtin_head(a); }
@@ -355,6 +372,7 @@ lval* builtin(lval* a, char* func) {
     if (strcmp("join", func) == 0) { return builtin_join(a); }
     if (strcmp("eval", func) == 0) { return builtin_eval(a); }
     if (strcmp("cons", func) == 0) { return builtin_cons(a); }
+    if (strcmp("len", func) == 0)  { return builtin_len(a); }
     if (strstr("+-/*", func)) { return builtin_op(a, func); }
     lval_del(a);
     return lval_err("Unknown Function!");
@@ -410,15 +428,15 @@ int main(int argc, char** argv) {
 
     // define them with the following language
     mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                        \
-            number   : /-?[0-9]+/ ;                                  \
-            symbol   : \"list\" | \"head\" | \"tail\"                \
-                     | \"join\" | \"eval\" | \"cons\"                \
-                     | '+' | '-' | '*' | '/' ;                       \
-            sexpr    : '(' <expr>* ')' ;                             \
-            qexpr    : '{' <expr>* '}' ;                             \
-            expr     : <number> | <symbol> | <sexpr> | <qexpr> ;     \
-            slither  : /^/ <expr>* /$/ ;                             \
+            "                                                    \
+            number   : /-?[0-9]+/ ;                              \
+            symbol   : \"list\" | \"head\" | \"tail\"            \
+                     | \"join\" | \"eval\" | \"cons\"            \
+                     | \"len\" | '+' | '-' | '*' | '/' ;         \
+            sexpr    : '(' <expr>* ')' ;                         \
+            qexpr    : '{' <expr>* '}' ;                         \
+            expr     : <number> | <symbol> | <sexpr> | <qexpr> ; \
+            slither  : /^/ <expr>* /$/ ;                         \
             ",
             Number, Symbol, Sexpr, Qexpr, Expr, Slither);
 

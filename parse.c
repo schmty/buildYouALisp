@@ -28,8 +28,12 @@ void add_history(char* unused) {}
 
 #define LASSERT(args, cond, err) \
     if (!(cond)) { lval_del(args); return lval_err(err); }
-#define IASSERT(args, cond, err) \
-    if (!(cond)) { lval_del(args); return lval_err(err); }
+// TODO: clean up folding on this at some point
+#define ARGASSERT(args_num, req_args, err) { \
+    if (args_num != req_args) {              \
+        return lval_err(err);                \
+    }                                        \
+}
 
 // possible lval types enum
 enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR };
@@ -259,8 +263,8 @@ lval* builtin_op(lval* a, char* op) {
 }
 
 lval* builtin_head(lval* a) {
-    LASSERT(a, a->count == 1,
-            "Function 'head' passed too many arguments!");
+    ARGASSERT(a->count, 1,
+              "Function 'head' passed incorrect ammount of args, 'head' takes 1 arg.");
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
             "Function 'head' passed incorrect type!");
     LASSERT(a, a->cell[0]->count != 0,
@@ -274,8 +278,8 @@ lval* builtin_head(lval* a) {
 }
 
 lval* builtin_tail(lval* a) {
-    LASSERT(a, a->count == 1,
-            "Function 'tail' passed too many arguments!");
+    ARGASSERT(a->count, 1,
+            "Function 'tail' passed incorrect amount of args! 'tail' takes 1 arg.");
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
             "Function 'tail' passed incorrect type!");
     LASSERT(a, a->cell[0]->count != 0,
@@ -298,8 +302,8 @@ lval* builtin_list(lval* a) {
 lval* lval_eval(lval* v);
 
 lval* builtin_eval(lval* a) {
-    LASSERT(a, a->count == 1,
-            "Function 'eval' passed too many arguments!");
+    ARGASSERT(a->count, 1,
+            "Function 'eval' passed incorrect amount of args! 'eval' takes 1 arg");
     LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
             "Function 'eval' passed incorrect type!");
 
@@ -340,8 +344,8 @@ lval* builtin_join(lval* a) {
 
 // TODO: build a more efficient cons
 lval* builtin_cons(lval* a) {
-    LASSERT(a, a->count == 2,
-            "Function 'cons' passed to many args!");
+    ARGASSERT(a->count, 2,
+            "Function 'cons' passed incorrect amount of args! 'cons' takes 2 args.");
     lval* x = lval_qexpr();
     x = lval_add(x, lval_pop(a, 0));
     while (a->count) {
@@ -354,8 +358,8 @@ lval* builtin_cons(lval* a) {
 // init will take a qexpr and return all elements except the final one
 lval* builtin_init(lval* a) {
     // TODO: make all errors more informative like this one
-    LASSERT(a, a->count == 1,
-            "Function 'init' given too many args! 'init' takes one qexpr.");
+    ARGASSERT(a->count, 1,
+            "Function 'init' given incorrect amount of args! 'init' takes 1 arg.");
     LASSERT(a, a->type == LVAL_QEXPR,
             "Function 'init' given wrong type! 'init' takes type qexpr.");
     lval_pop(a->cell[0], a->cell[0]->count-1);
@@ -368,8 +372,8 @@ lval* builtin_init(lval* a) {
 lval* builtin_len(lval* a) {
     LASSERT(a, a->type == LVAL_QEXPR,
             "Function 'len' passed the wrong type!");
-    LASSERT(a, a->count == 1,
-            "Function 'len' passed too many args!");
+    ARGASSERT(a->count, 1,
+            "Function 'len' passed incorrect amount of args! 'len takes 1 arg.'");
     // @TODO: will i need to clean memory for this one? not sure
     lval* x = lval_num(a->cell[0]->count);
     // @TODO: should I delete a?

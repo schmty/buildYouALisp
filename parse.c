@@ -351,6 +351,19 @@ lval* builtin_cons(lval* a) {
     return x;
 }
 
+// init will take a qexpr and return all elements except the final one
+lval* builtin_init(lval* a) {
+    // TODO: make all errors more informative like this one
+    LASSERT(a, a->count == 1,
+            "Function 'init' given too many args! 'init' takes one qexpr.");
+    LASSERT(a, a->type == LVAL_QEXPR,
+            "Function 'init' given wrong type! 'init' takes type qexpr.");
+    lval_pop(a->cell[0], a->cell[0]->count-1);
+
+    lval* x = lval_take(a, 0);
+    return x;
+}
+
 // should I return an int?
 lval* builtin_len(lval* a) {
     LASSERT(a, a->type == LVAL_QEXPR,
@@ -373,6 +386,7 @@ lval* builtin(lval* a, char* func) {
     if (strcmp("eval", func) == 0) { return builtin_eval(a); }
     if (strcmp("cons", func) == 0) { return builtin_cons(a); }
     if (strcmp("len", func) == 0)  { return builtin_len(a); }
+    if (strcmp("init", func) == 0) { return builtin_init(a); }
     if (strstr("+-/*", func)) { return builtin_op(a, func); }
     lval_del(a);
     return lval_err("Unknown Function!");
@@ -428,15 +442,15 @@ int main(int argc, char** argv) {
 
     // define them with the following language
     mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                    \
-            number   : /-?[0-9]+/ ;                              \
-            symbol   : \"list\" | \"head\" | \"tail\"            \
-                     | \"join\" | \"eval\" | \"cons\"            \
-                     | \"len\" | '+' | '-' | '*' | '/' ;         \
-            sexpr    : '(' <expr>* ')' ;                         \
-            qexpr    : '{' <expr>* '}' ;                         \
-            expr     : <number> | <symbol> | <sexpr> | <qexpr> ; \
-            slither  : /^/ <expr>* /$/ ;                         \
+            "                                                      \
+            number   : /-?[0-9]+/ ;                                \
+            symbol   : \"list\" | \"head\" | \"tail\"              \
+                     | \"join\" | \"eval\" | \"cons\"              \
+                     | \"len\" | \"init\" |'+' | '-' | '*' | '/' ; \
+            sexpr    : '(' <expr>* ')' ;                           \
+            qexpr    : '{' <expr>* '}' ;                           \
+            expr     : <number> | <symbol> | <sexpr> | <qexpr> ;   \
+            slither  : /^/ <expr>* /$/ ;                           \
             ",
             Number, Symbol, Sexpr, Qexpr, Expr, Slither);
 

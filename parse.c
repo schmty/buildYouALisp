@@ -340,8 +340,9 @@ lval* builtin_cons(lval* a) {
     LASSERT(a, a->count == 2,
             "Function 'cons' passed to many args!");
     lval* x = lval_qexpr();
+    x = lval_add(x, lval_pop(a, 0));
     while (a->count) {
-        x = lval_add(x, lval_pop(a, 0));
+        x = lval_join(x, lval_pop(a, 0));
     }
     return x;
 }

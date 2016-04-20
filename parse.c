@@ -337,17 +337,12 @@ lval* builtin_join(lval* a) {
 
 
 lval* builtin_cons(lval* a) {
-    lval* x = lval_pop(a, 0);
-    x->type = LVAL_QEXPR;
-    for (int i = 0; i < a->count; i++) {
-        LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
-            "Function 'cons' passed incorrect type!");
-
+    LASSERT(a, a->count == 2,
+            "Function 'cons' passed to many args!");
+    lval* x = lval_qexpr();
+    while (a->count) {
+        x = lval_add(x, lval_pop(a, 0));
     }
-    while(a->count) {
-        x = lval_join(x, lval_pop(a, 0));
-    }
-    lval_del(a);
     return x;
 }
 

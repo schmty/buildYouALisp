@@ -563,6 +563,55 @@ lval* builtin_list(lenv* e, lval* a) {
     return a;
 }
 
+// builtin comparisons
+// will return a 1 or a 0 as an lval_num
+lval* builtin_compare(lenv* e, lval* a, char* op) {
+    // TODO: error to ensure comparison of same type
+    // TODO: ensure 2 things compared and no more
+
+    LASSERT_NUM(op, a, 2);
+    LASSERT_TYPE(op, a, 0, LVAL_NUM);
+    LASSERT_TYPE(op, a, 1, LVAL_NUM);
+    // binary comparison operators
+    // result to be used for storage
+    int res;
+    if (strcmp(op, ">") == 0) { res = (a->cell[0]->num > a->cell[1]->num); }
+    if (strcmp(op, "<") == 0) { res = (a->cell[0]->num < a->cell[1]->num); }
+    if (strcmp(op, ">=") == 0) { res = (a->cell[0]->num >= a->cell[1]->num); }
+    if (strcmp(op, "<=") == 0) { res = (a->cell[0]->num <= a->cell[1]->num); }
+    if (strcmp(op, "==") == 0) { res = (a->cell[0]->num == a->cell[1]->num); }
+    if (strcmp(op, "!=") == 0) { res = (a->cell[0]->num != a->cell[1]->num); }
+
+    lval_del(a);
+    return lval_num(res);
+}
+
+lval* builtin_gt(lenv* e, lval* a) {
+    return builtin_compare(e, a, ">");
+}
+
+lval* builtin_lt(lenv* e, lval* a) {
+    return builtin_compare(e, a, "<");
+}
+
+lval* builtin_gte(lenv* e, lval* a) {
+    return builtin_compare(e, a, ">=");
+}
+
+lval* builtin_lte(lenv* e, lval* a) {
+    return builtin_compare(e, a, "<=");
+}
+
+lval* builtin_eq(lenv* e, lval* a) {
+    return builtin_compare(e, a, "==");
+}
+
+lval* builtin_neq(lenv* e, lval* a) {
+    return builtin_compare(e, a, "!=");
+}
+
+// TODO: build function for unary operators
+
 lval* lval_eval(lenv* e, lval* v);
 
 lval* builtin_eval(lenv* e, lval* a) {
@@ -841,6 +890,14 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "\\", builtin_lambda);
     lenv_add_builtin(e, "def", builtin_def);
     lenv_add_builtin(e, "=", builtin_put);
+
+    // comparison functions
+    lenv_add_builtin(e, ">", builtin_gt);
+    lenv_add_builtin(e, "<", builtin_lt);
+    lenv_add_builtin(e, ">=", builtin_gte);
+    lenv_add_builtin(e, "<=", builtin_lte);
+    lenv_add_builtin(e, "==", builtin_eq);
+    lenv_add_builtin(e, "!=", builtin_neq);
 }
 
 lval* builtin(lenv* e, lval* a, char* func) {

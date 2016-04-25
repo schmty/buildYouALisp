@@ -515,6 +515,33 @@ lval* builtin_len(lenv* e, lval* a) {
     return x;
 }
 
+lval* builtin_def(lenv* e, lval* a) {
+    LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
+            "Function 'def' passed incorrect type!");
+
+    // first argument is a symbol list
+    lval* syms = a->cell[0];
+
+    // ensure all elements of first list are symbols
+    for (int i = 0; i < syms->count; i++) {
+        LASSERT(a, syms->cell[i]->type == LVAL_SYM,
+                "Function 'def' cannot define non-symbol");
+    }
+
+    // check correct number of symbols and values
+    LASSERT(a, syms->count == a->count-1,
+            "Function 'def' cannot define incorrect number of values to symbols");
+
+    // assign copies of values to symbols
+    // puts a copy of the variable defined into our environment
+    for (int i = 0; i < syms->count; i++) {
+        lenv_put(e, syms->cell[i], a->cell[i+1]);
+    }
+
+    lval_del(a);
+    return lval_sexpr();
+}
+
 // add builtin functions to the environment
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
     lval* k = lval_sym(name);
@@ -539,6 +566,9 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "-", builtin_sub);
     lenv_add_builtin(e, "*", builtin_mul);
     lenv_add_builtin(e, "/", builtin_div);
+
+    // variable functions
+    lenv_add_builtin(e, "def", builtin_def);
 }
 
 lval* builtin(lenv* e, lval* a, char* func) {

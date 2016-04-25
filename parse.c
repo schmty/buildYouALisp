@@ -602,6 +602,23 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
         // pop the first symbol from the formals
         lval* sym = lval_pop(f->formals, 0);
 
+        // special case to deal with '&'
+        if (strcmp(sym->sym, "&") == 0) {
+            // ensure '&' is followed by another symbol
+            if (f->formals->count != 1) {
+                lval_del(a);
+                return lval_err("Function format invalid. "
+                    "Symbol '&' not followed by single symbol.");
+            }
+
+            // next formal should be bound to remaining args
+            lval* nsym = lval_pop(f->formals, 0);
+            lenv_put(f->env, nsym, builtin_list(e, a));
+            lval_del(sym);
+            lval_del(nsym);
+            break;
+        }
+
         // pop the next arg from the list
         lval* val = lval_pop(a, 0);
 
@@ -613,6 +630,28 @@ lval* lval_call(lenv* e, lval* f, lval* a) {
         lval_del(val);
     }
 
+    // if '&' remains in formal list bind to empty list
+    if (f->formals->count > 0 &&
+        strcmp(f->formals->cell[0]->sym, "&") == 0) {
+
+        // check to ensure that & is not passed invalidly
+        if (f->formals->count != 2) {
+            return lval_err("Function format invalid. "
+                "Symbol '&' not followed by single symbol.");
+        }
+
+        // pop and delete '&' symbol
+        lval_del(lval_pop(f->formals, 0));
+
+        // pop next symbol and create empty list
+        lval* sym = lval_pop(f->formals, 0);
+        lval* val = lval_qexpr();
+
+        // bind to environment and delete
+        lenv_put(f->env, sym, val);
+        lval_del(sym);
+        lval_del(val);
+    }
     // arg list is now bound so can be cleared up
     lval_del(a);
 
@@ -713,35 +752,6 @@ lval* builtin_len(lenv* e, lval* a) {
     return x;
 }
 
-lval* builtin_def(lenv* e, lval* a) {
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
-            "Function 'def' passed incorrect type for arg 0 ",
-            "Got %s, Expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
-
-    // first argument is a symbol list
-    lval* syms = a->cell[0];
-
-    // ensure all elements of first list are symbols
-    for (int i = 0; i < syms->count; i++) {
-        LASSERT(a, syms->cell[i]->type == LVAL_SYM,
-                "Function 'def' cannot define non-symbol");
-    }
-
-    // check correct number of symbols and values
-    LASSERT(a, syms->count == a->count-1,
-            "Function 'def' cannot define incorrect number of values to symbols");
-
-    // assign copies of values to symbols
-    // puts a copy of the variable defined into our environment
-    for (int i = 0; i < syms->count; i++) {
-        lenv_put(e, syms->cell[i], a->cell[i+1]);
-    }
-
-    lval_del(a);
-    return lval_sexpr();
-}
-
 lval* builtin_lambda(lenv* e, lval* a) {
     // check two arguments, each of which are q expressions
     LASSERT_NUM("\\", a, 2);
@@ -792,6 +802,10 @@ lval* builtin_var(lenv* e, lval* a, char* func) {
 
     lval_del(a);
     return lval_sexpr();
+}
+
+lval* builtin_def(lenv* e, lval* a) {
+    return builtin_var(e, a, "def");
 }
 
 lval* builtin_put(lenv* e, lval* a) {
@@ -913,7 +927,7 @@ lval* lval_eval(lenv* e, lval* v) {
                 Number, Symbol, Sexpr, Qexpr, Expr, Slither);
 
         /* Print version and exit info */
-        puts("Slither version 0.0.9");
+        puts("Slither version 0.0.12");
         puts("Press ctrl+c to exit\n");
 
         // create environment

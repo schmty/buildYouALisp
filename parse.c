@@ -33,8 +33,23 @@ void add_history(char* unused) {}
         return err; \
     }
 
+#define LASSERT_TYPE(func, args, index, expect) \
+    LASSERT(args, args->cell[index]->type == expect, \
+            "Function '%s' passed incorrect type for argument %i. " \
+            "Got %s, Expected %s.", \
+            func, index, ltype_name(args->cell[index]->type), ltype_name(expect))
+
+#define LASSERT_NUM(func, args, num) \
+    LASSERT(args, args->count == num, \
+            "Function '%s' passed incorrect number of arguments. " \
+            "Got %i, Expected %i.", func, args->count, num)
+
+#define LASSERT_NOT_EMPTY(func, args, index) \
+    LASSERT(args, args->cell[index]->count != 0, \
+            "Function '%s' passed {} for argument %i.", func, index);
+
 // TODO: update EMPTYASSERT to resemble LASSERT
-#define EMPTYASSERT(qexpr, func_name)\
+#define EMPTYASSERT(qexpr, func_name) \
     if (qexpr->cell[0]->count == 0) { lval_del(qexpr); return lval_err("Function '%s' passed an empty {}.", func_name); }
 
 
@@ -43,6 +58,9 @@ struct lval;
 struct lenv;
 typedef struct lval lval;
 typedef struct lenv lenv;
+void lenv_del(lenv* e);
+lenv* lenv_copy(lenv* e);
+
 // possible lval types enum
 enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR, LVAL_FUN };
 
@@ -54,19 +72,27 @@ typedef lval*(*lbuiltin) (lenv*, lval*);
 // declare new lval struct (lisp value)
 struct lval {
     int type;
+
+    // Basic
     long num;
-    // error and symbol types have some string data
     char* err;
     char* sym;
 
-    lbuiltin fun;
-    // count and pointer to a list of "lval*"
+    // Function
+    lbuiltin builtin;
+    lenv* env;
+    lval* formals;
+    lval* body;
+
+    // Expression
     int count;
-    struct lval** cell;
+    lval** cell;
 };
 
 // lenv struct
 struct lenv {
+    // parent environment
+    lenv* par;
     int count;
     char** syms;
     lval** vals;
@@ -98,7 +124,13 @@ void lval_del(lval* v) {
     switch (v->type) {
         // do nothing for a number type or function type
         case LVAL_NUM: break;
-        case LVAL_FUN: break;
+        case LVAL_FUN:
+            if (!v->builtin) {
+                lenv_del(v->env);
+                lval_del(v->formals);
+                lval_del(v->body);
+            }
+        break;
         // free err or sym string data
         case LVAL_ERR: free(v->err); break;
         case LVAL_SYM: free(v->sym); break;
@@ -120,6 +152,7 @@ void lval_del(lval* v) {
 lenv* lenv_new(void) {
     // construct a new empty environment
     lenv* e = malloc(sizeof(lenv));
+    e->par = NULL;
     e->count = 0;
     e->syms = NULL;
     e->vals = NULL;
@@ -137,11 +170,27 @@ void lenv_del(lenv* e) {
     free(e);
 }
 
+lval* lval_lambda(lval* formals, lval* body) {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_FUN;
+
+    // set builtin to null
+    v->builtin = NULL;
+
+    // build new environment
+    v->env = lenv_new();
+
+    // set formals and body
+    v->formals = formals;
+    v->body = body;
+    return v;
+}
+
 // lval function type
 lval* lval_fun(lbuiltin func) {
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_FUN;
-    v->fun = func;
+    v->builtin = func;
     return v;
 }
 
@@ -259,7 +308,17 @@ void lval_expr_print(lval* v, char open, char close) {
 void lval_print(lval* v) {
     switch (v->type) {
         case LVAL_NUM: printf("%li", v->num); break;
-        case LVAL_FUN: printf("<function>"); break;
+        case LVAL_FUN:
+            if (v->builtin) {
+                printf("<builtin>");
+            } else {
+                printf("(\\ ");
+                lval_print(v->formals);
+                putchar(' ');
+                lval_print(v->body);
+                putchar(')');
+            }
+        break;
         case LVAL_ERR: printf("Error: %s", v->err); break;
         case LVAL_SYM: printf("%s", v->sym); break;
         case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
@@ -298,7 +357,16 @@ lval* lval_copy(lval* v) {
 
     switch (v->type) {
         // copy functions and numbers directly
-        case LVAL_FUN: x->fun = v->fun; break;
+        case LVAL_FUN:
+            if (v->builtin) {
+                x->builtin = v->builtin;
+            } else {
+                x->builtin = NULL;
+                x->env = lenv_copy(v->env);
+                x->formals = lval_copy(v->formals);
+                x->body = lval_copy(v->body);
+            }
+        break;
         case LVAL_NUM: x->num = v->num; break;
 
         // copy strings using malloc and strcpy
@@ -335,8 +403,26 @@ lval* lenv_get(lenv* e, lval* k) {
             return lval_copy(e->vals[i]);
         }
     }
-    // if no symbol found return error
-    return lval_err("Unbound Symbol '%s'", k->sym);
+    // if no symbol found check for in parent otherwise return error
+    if (e->par) {
+        return lenv_get(e->par, k);
+    } else {
+        return lval_err("Unbound Symbol '%s'", k->sym);
+    }
+}
+
+lenv* lenv_copy(lenv* e) {
+    lenv* n = malloc(sizeof(lenv));
+    n->par = e->par;
+    n->count = e->count;
+    n->syms = malloc(sizeof(char*) * n->count);
+    n->vals = malloc(sizeof(lval*) * n->count);
+    for (int i = 0; i < e->count; i++) {
+        n->syms[i] = malloc(strlen(e->syms[i]) + 1);
+        strcpy(n->syms[i], e->syms[i]);
+        n->vals[i] = lval_copy(e->vals[i]);
+    }
+    return n;
 }
 
 // put a new variable into the environment
@@ -362,6 +448,15 @@ void lenv_put(lenv* e, lval* k, lval* v) {
     e->vals[e->count-1] = lval_copy(v);
     e->syms[e->count-1] = malloc(strlen(k->sym)+1);
     strcpy(e->syms[e->count-1], k->sym);
+}
+
+void lenv_def(lenv* e, lval* k, lval* v) {
+    // iterate till e has no parent
+    while (e->par) {
+        e = e->par;
+    }
+    // put value in e
+    lenv_put(e, k, v);
 }
 
 // builtin op descriptions
@@ -434,7 +529,7 @@ lval* builtin_head(lenv* e, lval* a) {
             "Function 'head' passed incorrect type for arg 0. "
             "Got %s, Expected %s.",
             ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
-    EMPTYASSERT(a, "head");
+    LASSERT_NOT_EMPTY("head", a, 0);
 
     lval* v = lval_take(a, 0);
 
@@ -452,7 +547,7 @@ lval* builtin_tail(lenv* e, lval* a) {
             "Function 'tail' passed incorrect type for arg 0. "
             "Got %s, Expected %s.",
             ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
-    EMPTYASSERT(a, "tail");
+    LASSERT_NOT_EMPTY("tail", a, 0);
     // take the first argument
     // note that this is taking the entire vector and modifying a new version (immutable?)
     // not sure
@@ -598,6 +693,62 @@ lval* builtin_def(lenv* e, lval* a) {
     return lval_sexpr();
 }
 
+lval* builtin_lambda(lenv* e, lval* a) {
+    // check two arguments, each of which are q expressions
+    LASSERT_NUM("\\", a, 2);
+    LASSERT_TYPE("\\", a, 0, LVAL_QEXPR);
+    LASSERT_TYPE("\\", a, 1, LVAL_QEXPR);
+
+    // check the first Q-Expression contains only symbols
+    for (int i = 0; i < a->cell[0]->count; i++) {
+        LASSERT(a, (a->cell[0]->cell[i]->type == LVAL_SYM),
+                "Cannot define non-symbol. Got %s, Expected %s.",
+                ltype_name(a->cell[0]->cell[i]->type), ltype_name(LVAL_SYM));
+    }
+
+    // pop the first two arguments and pass them to lval_lambda
+    lval* formals = lval_pop(a, 0);
+    lval* body = lval_pop(a, 0);
+    lval_del(a);
+
+    return lval_lambda(formals, body);
+}
+
+lval* builtin_var(lenv* e, lval* a, char* func) {
+    LASSERT_TYPE(func, a, 0, LVAL_QEXPR);
+
+    lval* syms = a->cell[0];
+    for (int i = 0; i < syms->count; i++) {
+        LASSERT(a, (syms->cell[i]->type == LVAL_SYM),
+                "Function '%s' cannot define non-symbol. "
+                "Got %s, Expected %s.", func,
+                ltype_name(syms->cell[i]->type),
+                ltype_name(LVAL_SYM));
+    }
+
+    LASSERT(a, (syms->count == a->count-1),
+            "Function '%s' passed too many arguments for symbols. "
+            "Got %i, Expected %i.", func, syms->count, a->count-1);
+
+    for (int i = 0; i < syms->count; i++) {
+        // if 'def' define in globally. If 'put' define in locally
+        if (strcmp(func, "def") == 0) {
+            lenv_def(e, syms->cell[i], a->cell[i+1]);
+        }
+
+        if (strcmp(func, "=") == 0) {
+            lenv_put(e, syms->cell[i], a->cell[i+1]);
+        }
+    }
+
+    lval_del(a);
+    return lval_sexpr();
+}
+
+lval* builtin_put(lenv* e, lval* a) {
+    return builtin_var(e, a, "=");
+}
+
 // add builtin functions to the environment
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
     lval* k = lval_sym(name);
@@ -625,6 +776,7 @@ void lenv_add_builtins(lenv* e) {
 
     // variable functions
     lenv_add_builtin(e, "def", builtin_def);
+    lenv_add_builtin(e, "=", builtin_put);
 }
 
 lval* builtin(lenv* e, lval* a, char* func) {
@@ -668,73 +820,74 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
     }
 
     // call builtin with operator
-    lval* result = f->fun(e, v);
+    lval* result = f->builtin(e, v);
     lval_del(f);
     return result;
 }
 
 lval* lval_eval(lenv* e, lval* v) {
     if (v->type == LVAL_SYM) {
-        lval* x = lenv_get(e, v);
-        lval_del(v);
-        return x;
-    }
-    // evaluate sexprs
-    if (v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
-    // all other lval types remain the same
-    return v;
-}
-
-int main(int argc, char** argv) {
-    // create some parsers
-    mpc_parser_t* Number = mpc_new("number");
-    mpc_parser_t* Symbol = mpc_new("symbol");
-    mpc_parser_t* Sexpr = mpc_new("sexpr");
-    mpc_parser_t* Qexpr = mpc_new("qexpr");
-    mpc_parser_t* Expr = mpc_new("expr");
-    mpc_parser_t* Slither = mpc_new("slither");
-
-    // define them with the following language
-    mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                      \
-            number   : /-?[0-9]+/ ;                                \
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/;           \
-            sexpr    : '(' <expr>* ')' ;                           \
-            qexpr    : '{' <expr>* '}' ;                           \
-            expr     : <number> | <symbol> | <sexpr> | <qexpr> ;   \
-            slither  : /^/ <expr>* /$/ ;                           \
-            ",
-            Number, Symbol, Sexpr, Qexpr, Expr, Slither);
-
-    /* Print version and exit info */
-    puts("Slither version 0.0.9");
-    puts("Press ctrl+c to exit\n");
-
-    // create environment
-    lenv* e = lenv_new();
-    lenv_add_builtins(e);
-    // in a never ending loop
-    while (1) {
-
-        // output our prompt and get input
-        char* input = readline("slither> ");
-
-        mpc_result_t r;
-        // add input to our history
-        add_history(input);
-
-        if (mpc_parse("<stdin>", input, Slither, &r)) {
-            // on success print the evaluation
-            lval* x = lval_eval(e, lval_read(r.output));
-            lval_println(x);
-            lval_del(x);
-
-            mpc_ast_delete(r.output);
-        } else {
-            // otherwise print the error
-            mpc_err_print(r.error);
-            mpc_err_delete(r.error);
+            lval* x = lenv_get(e, v);
+            lval_del(v);
+            return x;
         }
+        // evaluate sexprs
+        if (v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
+        // all other lval types remain the same
+        return v;
+    }
+
+    int main(int argc, char** argv) {
+        // create some parsers
+        mpc_parser_t* Number = mpc_new("number");
+        mpc_parser_t* Symbol = mpc_new("symbol");
+        mpc_parser_t* Sexpr = mpc_new("sexpr");
+        mpc_parser_t* Qexpr = mpc_new("qexpr");
+        mpc_parser_t* Expr = mpc_new("expr");
+        mpc_parser_t* Slither = mpc_new("slither");
+
+        // define them with the following language
+        mpca_lang(MPCA_LANG_DEFAULT,
+                "                                                      \
+                number   : /-?[0-9]+/ ;                                \
+                symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/;           \
+                sexpr    : '(' <expr>* ')' ;                           \
+                qexpr    : '{' <expr>* '}' ;                           \
+                expr     : <number> | <symbol> | <sexpr> | <qexpr> ;   \
+                slither  : /^/ <expr>* /$/ ;                           \
+                ",
+                Number, Symbol, Sexpr, Qexpr, Expr, Slither);
+
+        /* Print version and exit info */
+        puts("Slither version 0.0.9");
+        puts("Press ctrl+c to exit\n");
+
+        // create environment
+        lenv* e = lenv_new();
+        lenv_add_builtins(e);
+        // in a never ending loop
+        // TODO: create an exit function to exit more cleanly
+        while (1) {
+
+            // output our prompt and get input
+            char* input = readline("slither> ");
+
+            mpc_result_t r;
+            // add input to our history
+            add_history(input);
+
+            if (mpc_parse("<stdin>", input, Slither, &r)) {
+                // on success print the evaluation
+                lval* x = lval_eval(e, lval_read(r.output));
+                lval_println(x);
+                lval_del(x);
+
+                mpc_ast_delete(r.output);
+            } else {
+                // otherwise print the error
+                mpc_err_print(r.error);
+                mpc_err_delete(r.error);
+            }
 
         // free retrieved input
         free(input);

@@ -580,6 +580,55 @@ lval* builtin_eval(lenv* e, lval* a) {
     return lval_eval(e, x);
 }
 
+lval* lval_call(lenv* e, lval* f, lval* a) {
+    // if builtin then simply call that
+    if (f->builtin) { return f->builtin(e, a); }
+
+    // record argument counts
+    int given = a->count;
+    int total = f->formals->count;
+
+    // while args still remain to be processed
+    while (a->count) {
+
+        // if we've ran out of formal args to bind
+        // i.e arg count too large for defined func
+        if (f->formals->count == 0) {
+            lval_del(a);
+            return lval_err("Function passed too many arguments. "
+                            "Got %i, Expected %i.", given, total);
+        }
+
+        // pop the first symbol from the formals
+        lval* sym = lval_pop(f->formals, 0);
+
+        // pop the next arg from the list
+        lval* val = lval_pop(a, 0);
+
+        // bind a copy into the functions env
+        lenv_put(f->env, sym, val);
+
+        // delete the symbol and value
+        lval_del(sym);
+        lval_del(val);
+    }
+
+    // arg list is now bound so can be cleared up
+    lval_del(a);
+
+    // if all formals have been bound evaluate
+    if (f->formals->count == 0) {
+        // set env parent to evaluation env
+        f->env->par = e;
+
+        // evaluate and return
+        return builtin_eval(f->env, lval_add(lval_sexpr(), lval_copy(f->body)));
+    } else {
+        // otherwise return partially evaluated function
+        return lval_copy(f);
+    }
+}
+
 lval* lval_join(lval* x, lval* y) {
     // for each cell in y add it to x
     while (y->count) {
@@ -775,6 +824,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "/", builtin_div);
 
     // variable functions
+    lenv_add_builtin(e, "\\", builtin_lambda);
     lenv_add_builtin(e, "def", builtin_def);
     lenv_add_builtin(e, "=", builtin_put);
 }
@@ -814,13 +864,17 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
     // ensure first element is symbol
     lval* f = lval_pop(v, 0);
     if (f->type != LVAL_FUN) {
-        lval_del(v);
+        lval* err = lval_err(
+            "S-Expression starts with incorrect type. "
+            "Got %s, Expected %s.",
+            ltype_name(f->type), ltype_name(LVAL_FUN));
         lval_del(f);
-        return lval_err("first element is not a function");
+        lval_del(v);
+        return err;
     }
 
     // call builtin with operator
-    lval* result = f->builtin(e, v);
+    lval* result = lval_call(e, f, v);
     lval_del(f);
     return result;
 }

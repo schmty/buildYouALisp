@@ -655,7 +655,6 @@ lval* builtin_neq(lenv* e, lval* a) {
     return builtin_cmp(e, a, "!=");
 }
 
-
 lval* lval_eval(lenv* e, lval* v);
 
 lval* builtin_eval(lenv* e, lval* a) {
@@ -671,6 +670,29 @@ lval* builtin_eval(lenv* e, lval* a) {
     lval* x = lval_take(a, 0);
     x->type = LVAL_SEXPR;
     return lval_eval(e, x);
+}
+
+lval* builtin_if(lenv* e, lval* a) {
+    LASSERT_NUM("if", a, 3);
+    LASSERT_TYPE("if", a, 0, LVAL_NUM)
+    LASSERT_TYPE("if", a, 1, LVAL_QEXPR);
+    LASSERT_TYPE("if", a, 2, LVAL_QEXPR);
+
+    // if stuff
+
+    // convert both code cells to evaluatable
+    lval* result;
+    a->cell[1]->type = LVAL_SEXPR;
+    a->cell[2]->type = LVAL_SEXPR;
+
+    if (a->cell[0]->num) {
+        result = lval_eval(e, lval_pop(a, 1));
+    } else {
+        result = lval_eval(e, lval_pop(a, 2));
+    }
+    // else return the other thing
+    lval_del(a);
+    return result;
 }
 
 lval* lval_call(lenv* e, lval* f, lval* a) {
@@ -942,6 +964,9 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "<=", builtin_lte);
     lenv_add_builtin(e, "==", builtin_eq);
     lenv_add_builtin(e, "!=", builtin_neq);
+
+    // control (if else etc.)
+    lenv_add_builtin(e, "if", builtin_if);
 }
 
 lval* builtin(lenv* e, lval* a, char* func) {

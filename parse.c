@@ -604,48 +604,57 @@ int lval_eq(lval* a, lval* b) {
 
     // if types do not line up then return 0 (false)
     if (a->type != b->type) { return 0; }
-    int res;
     switch (a->type) {
         case LVAL_NUM:
-            res = (a->num == b->num);
+            return (a->num == b->num);
         break;
+        case LVAL_SYM:
+            return (a->sym == b->sym);
+        break;
+        case LVAL_ERR:
+            return (a->err == b->err);
         case LVAL_SEXPR:
         case LVAL_QEXPR:
             // if counts of qexpr isnt the same 0 (false)
-            if (a->count != b->count) {
-                res = 0;
-            } else {
-                for (int i = 0; i < a->count; i++) {
-                    if (a->cell[i] != b->cell[i]) {
-                        res = 0;
-                        break;
-                    }
-                    res = 1;
-                }
+            if (a->count != b->count) { return 0; }
+            for (int i = 0; i < a->count; i++) {
+                if (!lval_eq(a->cell[i], b->cell[i])) { return 0; }
             }
+            return 1;
         break;
-        default: res = 0;
+        case LVAL_FUN:
+            // if a and b are builtins compare the builtins
+            if (a->builtin && b->builtin) {
+                return (a->builtin == b->builtin);
+            } else {
+                return (a->formals == b->formals) && (a->body == b->body);
+            }
     }
-    // TODO: delete a and b?
-    return lval_num(res);
+    // if nothing else just return false
+    return 0;
 }
 
 lval* builtin_cmp(lenv* e, lval* a, char* op) {
-
+    LASSERT_NUM(op, a, 2);
+    lval* res;
+    if (strcmp(op, "==") == 0) {
+        res = lval_num(lval_eq(a->cell[0], a->cell[1]));
+    } else {
+        res = lval_num(!lval_eq(a->cell[0], a->cell[1]));
+    }
+    lval_del(a);
+    return res;
 }
 
-// TODO: fix equality tests
+// TODO: cleaner way of doing these two
 lval* builtin_eq(lenv* e, lval* a) {
-    LASSERT_NUM("==", a, 2);
-    return builtin_cmp(a->cell[0], a->cell[1], "==");
+    return builtin_cmp(e, a, "==");
 }
 
 lval* builtin_neq(lenv* e, lval* a) {
-    LASSERT_NUM("!=", a, 2);
-    return builtin_cmp(a->cell[0], a->cell[1], "!=");
+    return builtin_cmp(e, a, "!=");
 }
 
-// TODO: build function for unary operators
 
 lval* lval_eval(lenv* e, lval* v);
 

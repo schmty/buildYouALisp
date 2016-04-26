@@ -565,7 +565,7 @@ lval* builtin_list(lenv* e, lval* a) {
 
 // builtin comparisons
 // will return a 1 or a 0 as an lval_num
-lval* builtin_compare(lenv* e, lval* a, char* op) {
+lval* builtin_ord(lenv* e, lval* a, char* op) {
     // TODO: error to ensure comparison of same type
     // TODO: ensure 2 things compared and no more
 
@@ -579,35 +579,70 @@ lval* builtin_compare(lenv* e, lval* a, char* op) {
     if (strcmp(op, "<") == 0) { res = (a->cell[0]->num < a->cell[1]->num); }
     if (strcmp(op, ">=") == 0) { res = (a->cell[0]->num >= a->cell[1]->num); }
     if (strcmp(op, "<=") == 0) { res = (a->cell[0]->num <= a->cell[1]->num); }
-    if (strcmp(op, "==") == 0) { res = (a->cell[0]->num == a->cell[1]->num); }
-    if (strcmp(op, "!=") == 0) { res = (a->cell[0]->num != a->cell[1]->num); }
 
     lval_del(a);
     return lval_num(res);
 }
 
 lval* builtin_gt(lenv* e, lval* a) {
-    return builtin_compare(e, a, ">");
+    return builtin_ord(e, a, ">");
 }
 
 lval* builtin_lt(lenv* e, lval* a) {
-    return builtin_compare(e, a, "<");
+    return builtin_ord(e, a, "<");
 }
 
 lval* builtin_gte(lenv* e, lval* a) {
-    return builtin_compare(e, a, ">=");
+    return builtin_ord(e, a, ">=");
 }
 
 lval* builtin_lte(lenv* e, lval* a) {
-    return builtin_compare(e, a, "<=");
+    return builtin_ord(e, a, "<=");
 }
 
+int lval_eq(lval* a, lval* b) {
+
+    // if types do not line up then return 0 (false)
+    if (a->type != b->type) { return 0; }
+    int res;
+    switch (a->type) {
+        case LVAL_NUM:
+            res = (a->num == b->num);
+        break;
+        case LVAL_SEXPR:
+        case LVAL_QEXPR:
+            // if counts of qexpr isnt the same 0 (false)
+            if (a->count != b->count) {
+                res = 0;
+            } else {
+                for (int i = 0; i < a->count; i++) {
+                    if (a->cell[i] != b->cell[i]) {
+                        res = 0;
+                        break;
+                    }
+                    res = 1;
+                }
+            }
+        break;
+        default: res = 0;
+    }
+    // TODO: delete a and b?
+    return lval_num(res);
+}
+
+lval* builtin_cmp(lenv* e, lval* a, char* op) {
+
+}
+
+// TODO: fix equality tests
 lval* builtin_eq(lenv* e, lval* a) {
-    return builtin_compare(e, a, "==");
+    LASSERT_NUM("==", a, 2);
+    return builtin_cmp(a->cell[0], a->cell[1], "==");
 }
 
 lval* builtin_neq(lenv* e, lval* a) {
-    return builtin_compare(e, a, "!=");
+    LASSERT_NUM("!=", a, 2);
+    return builtin_cmp(a->cell[0], a->cell[1], "!=");
 }
 
 // TODO: build function for unary operators

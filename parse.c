@@ -919,6 +919,43 @@ lval* builtin_var(lenv* e, lval* a, char* func) {
     return lval_sexpr();
 }
 
+lval* builtin_not(lenv* e, lval* a) {
+    // if '!' operator expect 1 arg of num type
+    LASSERT_NUM("!", a, 1);
+    LASSERT_TYPE("!", a, 0, LVAL_NUM);
+    int res;
+    res = !(a->cell[0]->num);
+    lval_del(a);
+    return lval_num(res);
+}
+
+lval* builtin_logic(lenv* e, lval* a, char* op) {
+    // else other logic operators expect 2 num args
+    if (strcmp(op, "!") == 0) { return builtin_not(e, a); }
+    LASSERT_NUM(op, a, 2);
+    LASSERT_TYPE(op, a, 0, LVAL_NUM);
+    LASSERT_TYPE(op, a, 1, LVAL_NUM);
+    // TODO: arg amount checking
+    int res;
+    if (strcmp(op, "||") == 0) {
+        res = (a->cell[0]->num || a->cell[1]->num);
+    }
+    if (strcmp(op, "&&") == 0) {
+        res = (a->cell[0]->num && a->cell[1]->num);
+    }
+    lval_del(a);
+    return lval_num(res);
+}
+
+lval* builtin_or(lenv* e, lval* a) {
+    return builtin_logic(e, a, "||");
+}
+
+lval* builtin_and(lenv* e, lval* a) {
+    return builtin_logic(e, a, "&&");
+}
+
+
 lval* builtin_def(lenv* e, lval* a) {
     return builtin_var(e, a, "def");
 }
@@ -967,6 +1004,11 @@ void lenv_add_builtins(lenv* e) {
 
     // control (if else etc.)
     lenv_add_builtin(e, "if", builtin_if);
+
+    // logical operators
+    lenv_add_builtin(e, "||", builtin_or);
+    lenv_add_builtin(e, "&&", builtin_and);
+    lenv_add_builtin(e, "!", builtin_not);
 }
 
 lval* builtin(lenv* e, lval* a, char* func) {
@@ -1044,7 +1086,7 @@ lval* lval_eval(lenv* e, lval* v) {
         mpca_lang(MPCA_LANG_DEFAULT,
                 "                                                      \
                 number   : /-?[0-9]+/ ;                                \
-                symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/;           \
+                symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;           \
                 sexpr    : '(' <expr>* ')' ;                           \
                 qexpr    : '{' <expr>* '}' ;                           \
                 expr     : <number> | <symbol> | <sexpr> | <qexpr> ;   \

@@ -60,6 +60,17 @@ typedef struct lval lval;
 typedef struct lenv lenv;
 void lenv_del(lenv* e);
 lenv* lenv_copy(lenv* e);
+lval* lval_eval(lenv* e, lval* v);
+
+// FORWARD PARSER DECLARATIONS
+mpc_parser_t* Number;
+mpc_parser_t* Symbol;
+mpc_parser_t* String;
+mpc_parser_t* Comment;
+mpc_parser_t* Sexpr;
+mpc_parser_t* Qexpr;
+mpc_parser_t* Expr;
+mpc_parser_t* Slither;
 
 // possible lval types enum
 // TODO: Make LVAL_BOOL type
@@ -299,6 +310,7 @@ lval* lval_read(mpc_ast_t* t) {
     // string reading
     if (strstr(t->tag, "string")) { return lval_read_str(t); }
 
+
     // if root (>) or sexpr or qexpr then create empty list
     lval* x = NULL;
     if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); }
@@ -312,6 +324,8 @@ lval* lval_read(mpc_ast_t* t) {
         if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
         if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
         if (strcmp(t->children[i]->tag, "regex") == 0) { continue; }
+        // ignore comments
+        if (strstr(t->children[i]->tag, "comment")) { continue; }
         x = lval_add(x, lval_read(t->children[i]));
     }
     return x;
@@ -552,6 +566,48 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
     return x;
 }
 
+// builtin load
+lval* builtin_load(lenv* e, lval* a) {
+    LASSERT_NUM("load", a, 1);
+    LASSERT_TYPE("load", a, 0, LVAL_STR);
+
+    // parse file given by string name
+    mpc_result_t r;
+    if (mpc_parse_contents(a->cell[0]->str, Slither, &r)) {
+
+        // read contents
+        lval* expr = lval_read(r.output);
+        mpc_ast_delete(r.output);
+
+        // evaluate each expression
+        while (expr->count) {
+            lval* x = lval_eval(e, lval_pop(expr, 0));
+            // if evaluation leads to error print it
+            if (x->type == LVAL_ERR) { lval_println(x); }
+            lval_del(x);
+        }
+
+        // delete expressions and arguments
+        lval_del(expr);
+        lval_del(a);
+
+        // return empty list
+        return lval_sexpr();
+    } else {
+        // get parse error as string
+        char* err_msg = mpc_err_string(r.error);
+        mpc_err_delete(r.error);
+
+        // create new error message using it
+        lval* err = lval_err("Could not load library %s", err_msg);
+        free(err_msg);
+        lval_del(a);
+
+        // cleanup and return error
+        return err;
+    }
+}
+
 lval* builtin_add(lenv* e, lval* a) {
     return builtin_op(e, a, "+");
 }
@@ -707,7 +763,6 @@ lval* builtin_neq(lenv* e, lval* a) {
     return builtin_cmp(e, a, "!=");
 }
 
-lval* lval_eval(lenv* e, lval* v);
 
 lval* builtin_eval(lenv* e, lval* a) {
     LASSERT(a, a->count == 1,
@@ -1016,6 +1071,32 @@ lval* builtin_put(lenv* e, lval* a) {
     return builtin_var(e, a, "=");
 }
 
+lval* builtin_print(lenv* e, lval* a) {
+    // print each argument followed by a space
+    for (int i = 0; i < a->count; i++) {
+        lval_print(a->cell[i]);
+        putchar(' ');
+    }
+
+    // print a newline and delete args
+    putchar('\n');
+    lval_del(a);
+
+    return lval_sexpr();
+}
+
+lval* builtin_error(lenv* e, lval* a) {
+    LASSERT_NUM("error", a, 1);
+    LASSERT_TYPE("error", a, 0, LVAL_STR);
+
+    // construct error from first argument
+    lval* err = lval_err(a->cell[0]->str);
+
+    // delete arguments and return
+    lval_del(a);
+    return err;
+}
+
 // add builtin functions to the environment
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
     lval* k = lval_sym(name);
@@ -1061,6 +1142,11 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "||", builtin_or);
     lenv_add_builtin(e, "&&", builtin_and);
     lenv_add_builtin(e, "!", builtin_not);
+
+    // string functions
+    lenv_add_builtin(e, "load", builtin_load);
+    lenv_add_builtin(e, "error", builtin_error);
+    lenv_add_builtin(e, "print", builtin_print);
 }
 
 lval* builtin(lenv* e, lval* a, char* func) {
@@ -1119,44 +1205,50 @@ lval* lval_eval(lenv* e, lval* v) {
             lval_del(v);
             return x;
         }
-        // evaluate sexprs
-        if (v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
-        // all other lval types remain the same
-        return v;
-    }
+    // evaluate sexprs
+    if (v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
+    // all other lval types remain the same
+    return v;
+}
 
-    int main(int argc, char** argv) {
-        // create some parsers
-        mpc_parser_t* Number = mpc_new("number");
-        mpc_parser_t* Symbol = mpc_new("symbol");
-        mpc_parser_t* String = mpc_new("string");
-        mpc_parser_t* Sexpr = mpc_new("sexpr");
-        mpc_parser_t* Qexpr = mpc_new("qexpr");
-        mpc_parser_t* Expr = mpc_new("expr");
-        mpc_parser_t* Slither = mpc_new("slither");
+int main(int argc, char** argv) {
+    // create some parsers
+    // already forward declared
+    Number = mpc_new("number");
+    Symbol = mpc_new("symbol");
+    String = mpc_new("string");
+    Comment = mpc_new("comment");
+    Sexpr = mpc_new("sexpr");
+    Qexpr = mpc_new("qexpr");
+    Expr = mpc_new("expr");
+    Slither = mpc_new("slither");
 
-        // define them with the following language
-        mpca_lang(MPCA_LANG_DEFAULT,
-                "                                                                 \
-                number   : /-?[0-9]+/ ;                                           \
-                symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                     \
-                string   : /\"(\\\\.|[^\"])*\"/ ;                                 \
-                sexpr    : '(' <expr>* ')' ;                                      \
-                qexpr    : '{' <expr>* '}' ;                                      \
-                expr     : <number> | <symbol> | <sexpr> | <qexpr> | <string> ;   \
-                slither  : /^/ <expr>* /$/ ;                                      \
-                ",
-                Number, Symbol, String, Sexpr, Qexpr, Expr, Slither);
+    // define them with the following language
+    mpca_lang(MPCA_LANG_DEFAULT,
+            "                                                                 \
+            number   : /-?[0-9]+/ ;                                           \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                     \
+            string   : /\"(\\\\.|[^\"])*\"/ ;                                 \
+            comment  : /;[^\\r\\n]*/ ;                                        \
+            sexpr    : '(' <expr>* ')' ;                                      \
+            qexpr    : '{' <expr>* '}' ;                                      \
+            expr     : <number> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;   \
+            slither  : /^/ <expr>* /$/ ;                                      \
+            ",
+            Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
 
+    // create environment
+    lenv* e = lenv_new();
+    lenv_add_builtins(e);
+    // in a never ending loop
+    // TODO: create an exit function to exit more cleanly
+
+    // interactive prompt
+    if (argc == 1) {
         /* Print version and exit info */
-        puts("Slither version 0.0.12");
+        puts("Slither version 0.1.0");
         puts("Press ctrl+c to exit\n");
 
-        // create environment
-        lenv* e = lenv_new();
-        lenv_add_builtins(e);
-        // in a never ending loop
-        // TODO: create an exit function to exit more cleanly
         while (1) {
 
             // output our prompt and get input
@@ -1181,10 +1273,28 @@ lval* lval_eval(lenv* e, lval* v) {
 
         // free retrieved input
         free(input);
+
+        }
+    }
+
+    // supplied with a list of files
+    if (argc >= 2) {
+        // loop over each supplied filename (starting from 1)
+        for (int i = 1; i < argc; i++) {
+            // arg list with a single argument, the filename
+            lval* args = lval_add(lval_sexpr(), lval_str(argv[i]));
+
+            // pass to builtin load and get the result
+            lval* x = builtin_load(e, args);
+
+            // if the result is an error be sure to print it
+            if (x->type == LVAL_ERR) { lval_println(x); }
+            lval_del(x);
+        }
     }
 
     lenv_del(e);
     // undefine and delete parsers
-    mpc_cleanup(6, Number, Symbol, Sexpr, Qexpr, Expr, Slither);
+    mpc_cleanup(8, Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
     return 0;
 }

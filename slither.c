@@ -62,7 +62,8 @@ void lenv_del(lenv* e);
 lenv* lenv_copy(lenv* e);
 
 // possible lval types enum
-enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR, LVAL_FUN };
+// TODO: Make LVAL_BOOL type
+enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR, LVAL_FUN, LVAL_STR };
 
 // possible error types
 enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
@@ -77,6 +78,7 @@ struct lval {
     long num;
     char* err;
     char* sym;
+    char* str;
 
     // Function
     lbuiltin builtin;
@@ -106,6 +108,7 @@ char* ltype_name(int t) {
         case LVAL_SYM: return "Symbol";
         case LVAL_SEXPR: return "S-Expression";
         case LVAL_QEXPR: return "Q-Expression";
+        case LVAL_STR: return "String";
         default: return "Unknown";
     }
 }
@@ -142,6 +145,9 @@ void lval_del(lval* v) {
             }
             // also free the cell
             free(v->cell);
+        break;
+        case LVAL_STR:
+            free(v->str);
         break;
     }
     // free entire lval struct itself
@@ -191,6 +197,14 @@ lval* lval_fun(lbuiltin func) {
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_FUN;
     v->builtin = func;
+    return v;
+}
+
+lval* lval_str(char* s) {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_STR;
+    v->str = malloc(strlen(s) + 1);
+    strcpy(v->str, s);
     return v;
 }
 
@@ -261,11 +275,29 @@ lval* lval_read_num(mpc_ast_t* t) {
         lval_num(x) : lval_err("invalid number");
 }
 
+lval* lval_read_str(mpc_ast_t* t) {
+    // cut off the final quote char
+    t->contents[strlen(t->contents)-1] = '\0';
+    // copy the string missing out the first quote character
+    char* unescaped = malloc(strlen(t->contents+1)+1);
+    strcpy(unescaped, t->contents+1);
+    // pass through the unescape function
+    unescaped = mpcf_unescape(unescaped);
+    // construct a new lval using the string
+    lval* str = lval_str(unescaped);
+    // free the string and return
+    free(unescaped);
+    return str;
+}
+
 // lval read
 lval* lval_read(mpc_ast_t* t) {
     // if symbol or number return conversion to that type
     if (strstr(t->tag, "number")) { return lval_read_num(t); }
     if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
+
+    // string reading
+    if (strstr(t->tag, "string")) { return lval_read_str(t); }
 
     // if root (>) or sexpr or qexpr then create empty list
     lval* x = NULL;
@@ -303,6 +335,17 @@ void lval_expr_print(lval* v, char open, char close) {
     putchar(close);
 }
 
+void lval_print_str(lval* v) {
+    // make copy of the string
+    char* escaped = malloc(strlen(v->str)+1);
+    strcpy(escaped, v->str);
+    // pass it through the escape function
+    escaped = mpcf_escape(escaped);
+    // print it between " characters
+    printf("\"%s\"", escaped);
+    // free the copied string
+    free(escaped);
+}
 
 // print an lval
 void lval_print(lval* v) {
@@ -323,6 +366,7 @@ void lval_print(lval* v) {
         case LVAL_SYM: printf("%s", v->sym); break;
         case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
         case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
+        case LVAL_STR: lval_print_str(v); break;
     }
 }
 
@@ -388,6 +432,10 @@ lval* lval_copy(lval* v) {
             for (int i = 0; i < x->count; i++) {
                 x->cell[i] = lval_copy(v->cell[i]);
             }
+        break;
+        case LVAL_STR:
+            x->str = malloc(strlen(v->str) + 1);
+            strcpy(x->str, v->str);
         break;
     }
     return x;
@@ -629,6 +677,10 @@ int lval_eq(lval* a, lval* b) {
             } else {
                 return (a->formals == b->formals) && (a->body == b->body);
             }
+        break;
+        case LVAL_STR:
+            return (strcmp(a->str, b->str) == 0);
+        break;
     }
     // if nothing else just return false
     return 0;
@@ -1077,6 +1129,7 @@ lval* lval_eval(lenv* e, lval* v) {
         // create some parsers
         mpc_parser_t* Number = mpc_new("number");
         mpc_parser_t* Symbol = mpc_new("symbol");
+        mpc_parser_t* String = mpc_new("string");
         mpc_parser_t* Sexpr = mpc_new("sexpr");
         mpc_parser_t* Qexpr = mpc_new("qexpr");
         mpc_parser_t* Expr = mpc_new("expr");
@@ -1084,15 +1137,16 @@ lval* lval_eval(lenv* e, lval* v) {
 
         // define them with the following language
         mpca_lang(MPCA_LANG_DEFAULT,
-                "                                                      \
-                number   : /-?[0-9]+/ ;                                \
-                symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;           \
-                sexpr    : '(' <expr>* ')' ;                           \
-                qexpr    : '{' <expr>* '}' ;                           \
-                expr     : <number> | <symbol> | <sexpr> | <qexpr> ;   \
-                slither  : /^/ <expr>* /$/ ;                           \
+                "                                                                 \
+                number   : /-?[0-9]+/ ;                                           \
+                symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                     \
+                string   : /\"(\\\\.|[^\"])*\"/ ;                                 \
+                sexpr    : '(' <expr>* ')' ;                                      \
+                qexpr    : '{' <expr>* '}' ;                                      \
+                expr     : <number> | <symbol> | <sexpr> | <qexpr> | <string> ;   \
+                slither  : /^/ <expr>* /$/ ;                                      \
                 ",
-                Number, Symbol, Sexpr, Qexpr, Expr, Slither);
+                Number, Symbol, String, Sexpr, Qexpr, Expr, Slither);
 
         /* Print version and exit info */
         puts("Slither version 0.0.12");

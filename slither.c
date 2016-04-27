@@ -1,4 +1,5 @@
 #include "mpc.h"
+#include <string.h>
 
 // windows stuff
 #ifdef _WIN32
@@ -903,23 +904,37 @@ lval* lval_join(lval* x, lval* y) {
     return x;
 }
 
+// TODO: adapt join, tail, head, to work on strings
 lval* builtin_join(lenv* e, lval* a) {
-    for (int i = 0; i < a->count; i++) {
-        LASSERT(a, a->cell[i]->type == LVAL_QEXPR,
-                "Function 'join' passed incorrect type for arg %i ",
-                "Got %s, Expected %s.",
-                i, ltype_name(a->cell[i]->type), ltype_name(LVAL_QEXPR));
-    }
+    // if args are a string
+    if (a->cell[0]->type == LVAL_STR) {
+        // concat the strings
+        // I DONT KNOW MALLOC VERY WELL GET READY FOR A SEGFAULT BRO
+        lval* x = lval_str("");
+        for (int i = 0; i < a->count; i++) {
+            strcat(x->cell[0]->str, a->cell[i]->str);
+        }
+        lval_del(a);
+        return x;
+    } else {
+        for (int i = 0; i < a->count; i++) {
+            // TODO: fix error handling for both same types
+            LASSERT(a, a->cell[i]->type == LVAL_QEXPR,
+                    "Function 'join' passed incorrect type for arg %i ",
+                    "Got %s, Expected %s.",
+                    ltype_name(a->cell[i]->type), ltype_name(LVAL_QEXPR));
+        }
 
-    // TODO: go over the details of lval_pop and lval_take more
-    // need to gain better understanding
-    lval* x = lval_pop(a, 0);
-    while (a->count) {
-        x = lval_join(x, lval_pop(a, 0));
-    }
+        // TODO: go over the details of lval_pop and lval_take more
+        // need to gain better understanding
+        lval* x = lval_pop(a, 0);
+        while (a->count) {
+            x = lval_join(x, lval_pop(a, 0));
+        }
 
-    lval_del(a);
-    return x;
+        lval_del(a);
+        return x;
+    }
 }
 
 // TODO: build a more efficient cons

@@ -904,15 +904,30 @@ lval* lval_join(lval* x, lval* y) {
     return x;
 }
 
+lval* str_join(lval* a, lval* b) {
+    // join two strings
+    // +1 for null terminator
+    char* result = malloc(strlen(a->cell[0]->str) + strlen(b->cell[0]->str)+1);
+    strcpy(result, a->cell[0]->str);
+    strcat(result, b->cell[0]->str);
+    lval* x = lval_str(result);
+    free(result);
+    lval_del(a);
+    lval_del(b);
+    return x;
+}
+
 // TODO: adapt join, tail, head, to work on strings
 lval* builtin_join(lenv* e, lval* a) {
     // if args are a string
     if (a->cell[0]->type == LVAL_STR) {
-        // concat the strings
-        // I DONT KNOW MALLOC VERY WELL GET READY FOR A SEGFAULT BRO
-        lval* x = lval_str("");
-        for (int i = 0; i < a->count; i++) {
-            strcat(x->cell[0]->str, a->cell[i]->str);
+        // TODO: all string args
+        // while there are still arguments
+        // printing the string count
+        lval_print_str(a->cell[0]);
+        lval* x = lval_pop(a, 0);
+        while (a->count) {
+            x = str_join(x, lval_pop(a, 0));
         }
         lval_del(a);
         return x;

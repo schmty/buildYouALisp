@@ -687,6 +687,14 @@ lval* builtin_list(lenv* e, lval* a) {
     return a;
 }
 
+lval* builtin_show(lenv* e, lval* a) {
+    printf("%s", a->cell[0]->str);
+    putchar('\n');
+    // just return an empty sexpr after printing cstring
+    lval_del(a);
+    return lval_sexpr();
+}
+
 // builtin comparisons
 // will return a 1 or a 0 as an lval_num
 lval* builtin_ord(lenv* e, lval* a, char* op) {
@@ -1205,6 +1213,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "load", builtin_load);
     lenv_add_builtin(e, "error", builtin_error);
     lenv_add_builtin(e, "print", builtin_print);
+    lenv_add_builtin(e, "show", builtin_show);
 }
 
 lval* builtin(lenv* e, lval* a, char* func) {

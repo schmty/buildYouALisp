@@ -657,11 +657,21 @@ lval* builtin_tail(lenv* e, lval* a) {
             "Function 'tail' too many args. "
             "Got %i, Expected %i.",
             a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
+    LASSERT(a, (a->cell[0]->type == LVAL_QEXPR || a->cell[0]->type == LVAL_STR),
             "Function 'tail' passed incorrect type for arg 0. "
-            "Got %s, Expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
-    LASSERT_NOT_EMPTY("tail", a, 0);
+            "Got %s, Expected %s or %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR),
+            ltype_name(LVAL_STR));
+    if (a->cell[0]->type == LVAL_QEXPR) {
+        LASSERT_NOT_EMPTY("tail", a, 0);
+    }
+
+    if (a->cell[0]->type == LVAL_STR) {
+        // make a new lval with the string starting from element 1 to the end
+        lval* v = lval_str(&a->cell[0]->str[1]);
+        lval_del(a);
+        return v;
+    }
     // take the first argument
     // note that this is taking the entire vector and modifying a new version (immutable?)
     // not sure

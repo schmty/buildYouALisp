@@ -631,11 +631,19 @@ lval* builtin_head(lenv* e, lval* a) {
             "Function 'head' passed too many args. "
             "Got %i, Expected %i.",
             a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
+    LASSERT(a, (a->cell[0]->type == LVAL_QEXPR || a->cell[0]->type == LVAL_STR),
             "Function 'head' passed incorrect type for arg 0. "
-            "Got %s, Expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
-    LASSERT_NOT_EMPTY("head", a, 0);
+            "Got %s, Expected %s or %s.",
+            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR), ltype_name(LVAL_STR));
+    if (a->cell[0]->type == LVAL_QEXPR) {
+        LASSERT_NOT_EMPTY("head", a, 0);
+    }
+
+    if (a->cell[0]->type == LVAL_STR) {
+        lval* v = lval_str(&a->cell[0]->str[0]);
+        lval_del(a);
+        return v;
+    }
 
     lval* v = lval_take(a, 0);
 

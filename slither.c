@@ -1,5 +1,6 @@
 #include "mpc.h"
 #include <string.h>
+#include <stdlib.h>
 
 // windows stuff
 #ifdef _WIN32
@@ -907,24 +908,28 @@ lval* lval_join(lval* x, lval* y) {
 lval* str_join(lval* a, lval* b) {
     // join two strings
     // +1 for null terminator
-    char* result = malloc(strlen(a->cell[0]->str) + strlen(b->cell[0]->str)+1);
-    strcpy(result, a->cell[0]->str);
-    strcat(result, b->cell[0]->str);
-    lval* x = lval_str(result);
-    free(result);
+    char* result = malloc(strlen(a->str) + strlen(b->str)+1);
+    strcpy(result, a->str);
+    strcat(result, b->str);
+    // clean up args
     lval_del(a);
     lval_del(b);
-    return x;
+    return lval_str(result);
 }
 
 // TODO: adapt join, tail, head, to work on strings
 lval* builtin_join(lenv* e, lval* a) {
     // if args are a string
     if (a->cell[0]->type == LVAL_STR) {
-        // TODO: all string args
-        // while there are still arguments
-        // printing the string count
-        lval_print_str(a->cell[0]);
+        for (int i = 0; i < a->count; i++) {
+            // TODO: maybe make this clearer?
+            LASSERT(a, a->cell[i]->type == LVAL_QEXPR,
+                "Function 'join' passed incorrect type for arg %i ",
+                "Got %s, Expected %s.",
+                ltype_name(a->cell[i]->type), ltype_name(LVAL_STR));
+
+        }
+        // join first arg into x to kick it off
         lval* x = lval_pop(a, 0);
         while (a->count) {
             x = str_join(x, lval_pop(a, 0));
@@ -933,11 +938,10 @@ lval* builtin_join(lenv* e, lval* a) {
         return x;
     } else {
         for (int i = 0; i < a->count; i++) {
-            // TODO: fix error handling for both same types
             LASSERT(a, a->cell[i]->type == LVAL_QEXPR,
-                    "Function 'join' passed incorrect type for arg %i ",
-                    "Got %s, Expected %s.",
-                    ltype_name(a->cell[i]->type), ltype_name(LVAL_QEXPR));
+                "Function 'join' passed incorrect type for arg %i ",
+                "Got %s, Expected %s.",
+                ltype_name(a->cell[i]->type), ltype_name(LVAL_QEXPR));
         }
 
         // TODO: go over the details of lval_pop and lval_take more

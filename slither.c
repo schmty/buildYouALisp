@@ -56,6 +56,7 @@ void add_history(char* unused) {}
 
 
 // FORWARD DECLARATIONS
+// TODO: make an ok value to return instead of ()
 struct lval;
 struct lenv;
 typedef struct lval lval;
@@ -682,6 +683,30 @@ lval* builtin_tail(lenv* e, lval* a) {
     return v;
 }
 
+lval* builtin_len(lenv* e, lval* a) {
+    LASSERT(a, (a->cell[0]->type == LVAL_QEXPR) ||
+        (a->cell[0]->type == LVAL_STR),
+        "Function 'len' passed the wrong type for arg 0 "
+        "Got %s, Expected %s or %s.",
+        ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR), ltype_name(LVAL_STR));
+    LASSERT(a, a->count == 1,
+        "Function 'len' passed too many args. "
+        "Got %i, Expected %i.",
+        a->count, 1);
+    // @TODO: will i need to clean memory for this one? not sure
+    if (a->cell[0]->type == LVAL_STR) {
+        int size = (int) strlen(a->cell[0]->str);
+        lval_del(a);
+        return lval_num(size);
+    }
+    lval* x = lval_num(a->cell[0]->count);
+    // @TODO: should I delete a?
+    // TODO: really see if deleting a is needed
+    // I don't think so because we might still need it?
+    lval_del(a);
+    return x;
+}
+
 lval* builtin_list(lenv* e, lval* a) {
     a->type = LVAL_QEXPR;
     return a;
@@ -997,49 +1022,6 @@ lval* builtin_cons(lenv* e, lval* a) {
     return x;
 }
 
-// init will take a qexpr and return all elements except the final one
-lval* builtin_init(lenv* e, lval* a) {
-    // TODO: make all errors more informative like this one
-    // TODO: make sure this is completely immutable
-    LASSERT(a, a->count == 1,
-            "Function 'init' passed too many args. "
-            "Got %i, Expected %i.",
-            a->count, 1);
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
-            "Function 'init' given wrong type for arg 0 "
-            "Got %s, Expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
-    lval_pop(a->cell[0], a->cell[0]->count-1);
-
-    lval* x = lval_take(a, 0);
-    return x;
-}
-
-// should I return an int?
-lval* builtin_len(lenv* e, lval* a) {
-    LASSERT(a, (a->cell[0]->type == LVAL_QEXPR) ||
-        (a->cell[0]->type == LVAL_STR),
-        "Function 'len' passed the wrong type for arg 0 "
-        "Got %s, Expected %s or %s.",
-        ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR), ltype_name(LVAL_STR));
-    LASSERT(a, a->count == 1,
-        "Function 'len' passed too many args. "
-        "Got %i, Expected %i.",
-        a->count, 1);
-    // @TODO: will i need to clean memory for this one? not sure
-    if (a->cell[0]->type == LVAL_STR) {
-        int size = (int) strlen(a->cell[0]->str);
-        lval_del(a);
-        return lval_num(size);
-    }
-    lval* x = lval_num(a->cell[0]->count);
-    // @TODO: should I delete a?
-    // TODO: really see if deleting a is needed
-    // I don't think so because we might still need it?
-    lval_del(a);
-    return x;
-}
-
 lval* builtin_lambda(lenv* e, lval* a) {
     // check two arguments, each of which are q expressions
     LASSERT_NUM("\\", a, 2);
@@ -1223,8 +1205,7 @@ lval* builtin(lenv* e, lval* a, char* func) {
     if (strcmp("join", func) == 0) { return builtin_join(e, a); }
     if (strcmp("eval", func) == 0) { return builtin_eval(e, a); }
     if (strcmp("cons", func) == 0) { return builtin_cons(e, a); }
-    if (strcmp("len", func) == 0)  { return builtin_len(e, a); }
-    if (strcmp("init", func) == 0) { return builtin_init(e, a); }
+    if (strcmp("len", func) == 0) { return builtin_len(e, a); }
     if (strstr("+-/*", func)) { return builtin_op(e, a, func); }
     lval_del(a);
     return lval_err("Unknown Function!");

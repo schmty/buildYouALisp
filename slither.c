@@ -991,15 +991,21 @@ lval* builtin_init(lenv* e, lval* a) {
 
 // should I return an int?
 lval* builtin_len(lenv* e, lval* a) {
-    LASSERT(a, a->cell[0]->type == LVAL_QEXPR,
-            "Function 'len' passed the wrong type for arg 0 "
-            "Got %s, Expected %s.",
-            ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR));
+    LASSERT(a, (a->cell[0]->type == LVAL_QEXPR) ||
+        (a->cell[0]->type == LVAL_STR),
+        "Function 'len' passed the wrong type for arg 0 "
+        "Got %s, Expected %s or %s.",
+        ltype_name(a->cell[0]->type), ltype_name(LVAL_QEXPR), ltype_name(LVAL_STR));
     LASSERT(a, a->count == 1,
-            "Function 'len' passed too many args. "
-            "Got %i, Expected %i.",
-            a->count, 1);
+        "Function 'len' passed too many args. "
+        "Got %i, Expected %i.",
+        a->count, 1);
     // @TODO: will i need to clean memory for this one? not sure
+    if (a->cell[0]->type == LVAL_STR) {
+        int size = (int) strlen(a->cell[0]->str);
+        lval_del(a);
+        return lval_num(size);
+    }
     lval* x = lval_num(a->cell[0]->count);
     // @TODO: should I delete a?
     // TODO: really see if deleting a is needed

@@ -1,6 +1,4 @@
-#include "mpc/mpc.h"
-#include <string.h>
-#include <stdlib.h>
+#include "ext/mpc.h"
 
 // windows stuff
 #ifdef _WIN32
@@ -18,7 +16,6 @@ char* readline(char* prompt) {
     cpu[strlen(cpy)-1] = '\0';
     return cpy;
 }
-
 
 // fake add_history function for windows
 void add_history(char* unused) {}
@@ -975,7 +972,7 @@ lval* builtin_join(lenv* e, lval* a) {
     if (a->cell[0]->type == LVAL_STR) {
         for (int i = 0; i < a->count; i++) {
             // TODO: maybe make this clearer?
-            LASSERT(a, a->cell[i]->type == LVAL_QEXPR,
+            LASSERT(a, a->cell[i]->type == LVAL_STR,
                 "Function 'join' passed incorrect type for arg %i ",
                 "Got %s, Expected %s.",
                 ltype_name(a->cell[i]->type), ltype_name(LVAL_STR));

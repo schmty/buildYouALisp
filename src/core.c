@@ -1288,8 +1288,13 @@ int main(int argc, char** argv) {
     lenv_add_builtins(e);
 
     // load std lib no matter prompt or file loaded
-    lval* stdlib = lval_add(lval_sexpr(), lval_str("lib/slither/std.slr"));
-    builtin_load(e, stdlib);
+    // NOTE this filepath is relative to the slither binary
+    lval* stdlib = lval_add(lval_sexpr(), lval_str("/Users/jake/Projects/slither/lib/slither/std.slr"));
+    lval* load = builtin_load(e, stdlib);
+    if (load->type == LVAL_ERR) {
+        lval_println(load);
+        lval_del(load);
+    }
     // interactive prompt
     if (argc == 1) {
         /* Print version and exit info */
@@ -1341,6 +1346,7 @@ int main(int argc, char** argv) {
     }
 
     lenv_del(e);
+    lval_del(load);
     //lval_del(stdlib);
     // undefine and delete parsers
     mpc_cleanup(8, Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);

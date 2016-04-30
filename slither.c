@@ -1286,9 +1286,10 @@ int main(int argc, char** argv) {
     // create environment
     lenv* e = lenv_new();
     lenv_add_builtins(e);
-    // in a never ending loop
-    // TODO: create an exit function to exit more cleanly
 
+    // load std lib no matter prompt or file loaded
+    lval* stdlib = lval_add(lval_sexpr(), lval_str("lib/slither/std.slr"));
+    builtin_load(e, stdlib);
     // interactive prompt
     if (argc == 1) {
         /* Print version and exit info */
@@ -1340,6 +1341,7 @@ int main(int argc, char** argv) {
     }
 
     lenv_del(e);
+    //lval_del(stdlib);
     // undefine and delete parsers
     mpc_cleanup(8, Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
     return 0;

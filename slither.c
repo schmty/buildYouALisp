@@ -19,6 +19,7 @@ char* readline(char* prompt) {
     return cpy;
 }
 
+
 // fake add_history function for windows
 void add_history(char* unused) {}
 

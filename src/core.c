@@ -1022,9 +1022,9 @@ lval* builtin_cons(lenv* e, lval* a) {
 
 lval* builtin_lambda(lenv* e, lval* a) {
     // check two arguments, each of which are q expressions
-    LASSERT_NUM("\\", a, 2);
-    LASSERT_TYPE("\\", a, 0, LVAL_QEXPR);
-    LASSERT_TYPE("\\", a, 1, LVAL_QEXPR);
+    LASSERT_NUM("fn", a, 2);
+    LASSERT_TYPE("fn", a, 0, LVAL_QEXPR);
+    LASSERT_TYPE("fn", a, 1, LVAL_QEXPR);
 
     // check the first Q-Expression contains only symbols
     for (int i = 0; i < a->cell[0]->count; i++) {
@@ -1169,7 +1169,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "/", builtin_div);
 
     // variable functions
-    lenv_add_builtin(e, "\\", builtin_lambda);
+    lenv_add_builtin(e, "fn", builtin_lambda);
     lenv_add_builtin(e, "def", builtin_def);
     lenv_add_builtin(e, "=", builtin_put);
 

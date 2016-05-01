@@ -7,44 +7,44 @@
 
 ;;; Function definitions
 
-(def {fun} (\ {f b} {
-  def (head f) (\ (tail f) b)
+(def {defn} (fn {f b} {
+  def (head f) (fn (tail f) b)
 }))
 
 ; unpack list for function
-(fun {unpack f l} {
+(defn {unpack f l} {
   eval (join (list f) l)
 })
 
 ; pack list for function
-(fun {pack f & xs} {f xs})
+(defn {pack f & xs} {f xs})
 
 ; Curried and Uncurried calling
 (def {curry} unpack)
 (def {uncurry} pack)
 
 ; Perform several things in sequence
-(fun {do & l} {
+(defn {do & l} {
   if (== l nil)
     {nil}
     {last l}
 })
 
 ; Open new scope
-(fun {let b} {
-  ((\ {_} b) ())
+(defn {let b} {
+  ((fn {_} b) ())
 })
 
 ;;; Logical Functions
 
-(fun {not x} {- 1 x})
-(fun {or x y} {+ x y})
-(fun {and x y} {* x y})
+(defn {not x} {- 1 x})
+(defn {or x y} {+ x y})
+(defn {and x y} {* x y})
 
 ;;; Numeric functions
 
 ; Minimum arguments
-(fun {min & xs} {
+(defn {min & xs} {
   if (== (tail xs) nil) {fst xs}
     {do
       (= {rest} (unpack min (tail cs)))
@@ -54,7 +54,7 @@
 })
 
 ; Maximum arguments
-(fun {max & xs} {
+(defn {max & xs} {
   if (== (tail xs) nil) {fst xs}
     {do
       (= {rest} (unpack max (tail xs)))
@@ -65,100 +65,100 @@
 
 ;;; Miscellaneous Functions
 
-(fun {flip f a b} {f b a})
-(fun {ghost & xs} {eval xs})
-(fun {comp f g x} {f (g x)})
+(defn {flip f a b} {f b a})
+(defn {ghost & xs} {eval xs})
+(defn {comp f g x} {f (g x)})
 
 ;;; List Functions
 
 ; First, Second, or Third item in List
-(fun {fst l} {eval (head l)})
-(fun {snd l} {eval (head (tail l))})
-(fun {trd l} {eval (head (tail (tail l)))})
+(defn {fst l} {eval (head l)})
+(defn {snd l} {eval (head (tail l))})
+(defn {trd l} {eval (head (tail (tail l)))})
 
 ; Nth item in list
-(fun {nth n l} {
+(defn {nth n l} {
   if (== n 0)
   {fst l}
   {nth (- n 1) (tail l)}
 })
 
 ; Last item in list
-(fun {last l} {nth (- (len l) 1) l})
+(defn {last l} {nth (- (len l) 1) l})
 
 ; Take N items
-(fun {take n l} {
+(defn {take n l} {
   if (== n 0)
     {nil}
     {join (head l) (take (- n 1) (tail l))}
 })
 
 ; Drop N items
-(fun {drop n l} {
+(defn {drop n l} {
   if (== n 0)
     {l}
     {drop (- n 1) (tail l)}
 })
 
 ; Split at N
-(fun {split n l} {list (take n l) (drop n l)})
+(defn {split n l} {list (take n l) (drop n l)})
 
 ; Element of List
-(fun {elem x l} {
+(defn {elem x l} {
   if (== l nil)
     {false}
     {if (== x (fst l)) {true} {elem x (tail l)}}
 })
 
 ; Apply function to list
-(fun {map f l} {
+(defn {map f l} {
   if (== l nil)
     {nil}
     {join (list (f (fst l))) (map f (tail l))}
 })
 
 ; Apply filter to list
-(fun {filter f l} {
+(defn {filter f l} {
   if (== l nil)
     {nil}
     {join (if (f (fst l)) {head l} {nil}) (filter f (tail l))}
 })
 
 ; Return all of list but last element
-(fun {init l} {
+(defn {init l} {
   if (== (tail l) nil)
     {nil}
     {join (head l) (init (tail l))}
 })
 
 ; Reverse list
-(fun {reverse l} {
+(defn {reverse l} {
   if (== 1 nil)
     {nil}
     {join (reverse (tail l)) (head l)}
 })
 
 ; Fold Left
-(fun {foldl f z l} {
+(defn {foldl f z l} {
   if (== l nil)
     {z}
     {foldl f (f z (fst l)) (tail l)}
 })
 
 ; Fold Right
-(fun {foldr f z l} {
+(defn {foldr f z l} {
   if (== 1 nil)
     {z}
     {f (fst l) (foldr f z (tail l))}
 })
 
 ; Sum and Product
-(fun {sum l} {foldl + 0 1})
-(fun {product l} {foldl * 1 l})
+(defn {sum l} {foldl + 0 1})
+(defn {product l} {foldl * 1 l})
 
 ; Conditional functions
 ; Select
-(fun {select & cs} {
+(defn {select & cs} {
   if (== cs nil)
     {error "No Selection Found"}
     {if (fst (fst cs)) {snd (fst cs)} {unpack select (tail cs)}}
@@ -168,7 +168,7 @@
 (def {otherwise} true)
 
 ; actuale case function
-(fun {case x & cs} {
+(defn {case x & cs} {
   if (== cs nil)
     {error "No case found"}
     {if (== x (fst (fst cs))) {snd (fst cs)} {
@@ -176,7 +176,7 @@
 })
 
 ; fibonacci cause why not?
-(fun {fib n} {
+(defn {fib n} {
   select
     {(== n 0) 0}
     {(== n 1) 1}

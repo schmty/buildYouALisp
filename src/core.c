@@ -64,7 +64,8 @@ lenv* lenv_copy(lenv* e);
 lval* lval_eval(lenv* e, lval* v);
 
 // FORWARD PARSER DECLARATIONS
-mpc_parser_t* Number;
+mpc_parser_t* Long;
+mpc_parser_t* Float;
 mpc_parser_t* Symbol;
 mpc_parser_t* String;
 mpc_parser_t* Comment;
@@ -75,7 +76,7 @@ mpc_parser_t* Slither;
 
 // possible lval types enum
 // TODO: Make LVAL_BOOL type
-enum { LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR, LVAL_FUN, LVAL_STR };
+enum { LVAL_LONG, LVAL_FLOAT, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR, LVAL_FUN, LVAL_STR };
 
 // possible error types
 enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
@@ -87,7 +88,8 @@ struct lval {
     int type;
 
     // Basic
-    long num;
+    long lnum;
+    float fnum;
     char* err;
     char* sym;
     char* str;
@@ -115,7 +117,8 @@ struct lenv {
 char* ltype_name(int t) {
     switch(t) {
         case LVAL_FUN: return "Function";
-        case LVAL_NUM: return "Number";
+        case LVAL_LONG: return "Long";
+        case LVAL_FLOAT: return "Float";
         case LVAL_ERR: return "Error";
         case LVAL_SYM: return "Symbol";
         case LVAL_SEXPR: return "S-Expression";
@@ -138,7 +141,8 @@ lval* lval_add(lval* v, lval* x) {
 void lval_del(lval* v) {
     switch (v->type) {
         // do nothing for a number type or function type
-        case LVAL_NUM: break;
+        case LVAL_FLOAT:
+        case LVAL_LONG: break;
         case LVAL_FUN:
             if (!v->builtin) {
                 lenv_del(v->env);
@@ -220,11 +224,18 @@ lval* lval_str(char* s) {
     return v;
 }
 
-// construct a pointer to a new num type lval
-lval* lval_num(long x) {
+// construct a pointer to a new long type lval
+lval* lval_long(long x) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_NUM;
-    v->num = x;
+    v->type = LVAL_LONG;
+    v->lnum = x;
+    return v;
+}
+
+lval* lval_float(float x) {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_FLOAT;
+    v->fnum = x;
     return v;
 }
 
@@ -280,11 +291,19 @@ lval* lval_qexpr(void) {
 }
 
 // lval read num
-lval* lval_read_num(mpc_ast_t* t) {
+lval* lval_read_long(mpc_ast_t* t) {
     errno = 0;
     long x = strtol(t->contents, NULL, 10);
     return errno != ERANGE ?
-        lval_num(x) : lval_err("invalid number");
+        lval_long(x) : lval_err("invalid long");
+}
+
+// lval read float
+lval* lval_read_float(mpc_ast_t* t) {
+    errno = 0;
+    float x = strtof(t->contents, NULL);
+    return errno != ERANGE ?
+        lval_float(x) : lval_err("invalid float");
 }
 
 lval* lval_read_str(mpc_ast_t* t) {
@@ -305,7 +324,8 @@ lval* lval_read_str(mpc_ast_t* t) {
 // lval read
 lval* lval_read(mpc_ast_t* t) {
     // if symbol or number return conversion to that type
-    if (strstr(t->tag, "number")) { return lval_read_num(t); }
+    if (strstr(t->tag, "long")) { return lval_read_long(t); }
+    if (strstr(t->tag, "float")) { return lval_read_float(t); }
     if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
 
     // string reading
@@ -365,7 +385,8 @@ void lval_print_str(lval* v) {
 // print an lval
 void lval_print(lval* v) {
     switch (v->type) {
-        case LVAL_NUM: printf("%li", v->num); break;
+        case LVAL_LONG: printf("%li", v->lnum); break;
+        case LVAL_FLOAT: printf("%f", v->fnum); break;
         case LVAL_FUN:
             if (v->builtin) {
                 printf("<builtin>");
@@ -426,7 +447,8 @@ lval* lval_copy(lval* v) {
                 x->body = lval_copy(v->body);
             }
         break;
-        case LVAL_NUM: x->num = v->num; break;
+        case LVAL_LONG: x->lnum = v->lnum; break;
+        case LVAL_FLOAT: x->fnum = v->fnum; break;
 
         // copy strings using malloc and strcpy
         case LVAL_ERR:
@@ -522,22 +544,60 @@ void lenv_def(lenv* e, lval* k, lval* v) {
     lenv_put(e, k, v);
 }
 
-// builtin op descriptions
-lval* builtin_op(lenv* e, lval* a, char* op) {
-    // ensure all arguments are numbers
+// long to float conversion
+lval* lval_ltof(lval* a) {
+    lval* vals = lval_sexpr();
     for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type != LVAL_NUM) {
-            lval_del(a);
-            return lval_err("Cannot operate on non-number!");
+        if (a->cell[i]->type == LVAL_LONG) {
+            // put val into vals sexpr as a float
+            vals = lval_add(vals, lval_float((float) a->cell[i]->lnum));
+        } else {
+            // the val is a float just add it to the list
+            // do i need to be popping these?
+            vals = lval_add(vals, a->cell[i]);
         }
     }
+    lval_del(a);
+    return vals;
+}
 
+lval* lval_float_op(lenv* e, lval* a, char* op) {
+    // create a new lval containing a values all as a float
+
+    lval* vals = lval_ltof(a);
+
+    lval* x = lval_pop(vals, 0);
+
+    while (a->count > 0) {
+        lval* y = lval_pop(vals, 0);
+
+        if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
+        if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
+        if (strcmp(op, "*") == 0) { x->fnum *= y->fnum; }
+        if (strcmp(op, "/") == 0) {
+            if (y->fnum == 0) {
+                lval_del(x);
+                lval_del(y);
+                x = lval_err("Division by Zero!"); break;
+            }
+            x->fnum /= y->fnum;
+        }
+
+        lval_del(y);
+    }
+    lval_del(a);
+    lval_del(vals);
+    return x;
+}
+
+// long op descriptions
+lval* lval_long_op(lenv* e, lval* a, char* op) {
     // pop the first element
     lval* x = lval_pop(a, 0);
 
     // if no arguments and sub the perform unary negation
     if ((strcmp(op, "-") == 0) && a->count == 0) {
-        x->num = -x->num;
+        x->lnum = -x->lnum;
     }
 
     // while there are still elements remaining
@@ -548,16 +608,16 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
 
         // using += -= *= /= because of continual looping through list of
         // multiple arguments
-        if (strcmp(op, "+") == 0) { x->num += y->num; }
-        if (strcmp(op, "-") == 0) { x->num -= y->num; }
-        if (strcmp(op, "*") == 0) { x->num *= y->num; }
+        if (strcmp(op, "+") == 0) { x->lnum += y->lnum; }
+        if (strcmp(op, "-") == 0) { x->lnum -= y->lnum; }
+        if (strcmp(op, "*") == 0) { x->lnum *= y->lnum; }
         if (strcmp(op, "/") == 0) {
-            if (y->num == 0) {
+            if (y->lnum == 0) {
                 lval_del(x);
                 lval_del(y);
                 x = lval_err("Division by Zero!"); break;
             }
-            x->num /= y->num;
+            x->lnum /= y->lnum;
         }
 
         lval_del(y);
@@ -565,6 +625,16 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
 
     lval_del(a);
     return x;
+}
+
+// TODO: builtin op will go here
+lval* builtin_op(lenv* e, lval* a, char* op) {
+    for (int i = 0; i < a->count; i++) {
+        if (a->cell[i]->type == LVAL_FLOAT) {
+            return lval_float_op(e, a, op);
+        }
+    }
+    return lval_long_op(e, a, op);
 }
 
 // builtin load
@@ -1271,17 +1341,18 @@ int main(int argc, char** argv) {
 
     // define them with the following language
     mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                                 \
-            number   : /-?[0-9]+/ ;                                           \
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                     \
-            string   : /\"(\\\\.|[^\"])*\"/ ;                                 \
-            comment  : /;[^\\r\\n]*/ ;                                        \
-            sexpr    : '(' <expr>* ')' ;                                      \
-            qexpr    : '{' <expr>* '}' ;                                      \
-            expr     : <number> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;   \
-            slither  : /^/ <expr>* /$/ ;                                      \
+            "                                                                                     \
+            long     : /-?[0-9]+/ ;                                                               \
+            float    : /-?[0-9].+/ ;                                                              \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                                         \
+            string   : /\"(\\\\.|[^\"])*\"/ ;                                                     \
+            comment  : /;[^\\r\\n]*/ ;                                                            \
+            sexpr    : '(' <expr>* ')' ;                                                          \
+            qexpr    : '{' <expr>* '}' ;                                                          \
+            expr     : <long> | <float> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;   \
+            slither  : /^/ <expr>* /$/ ;                                                          \
             ",
-            Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
+            Long, Float, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
 
     // create environment
     lenv* e = lenv_new();
@@ -1349,6 +1420,6 @@ int main(int argc, char** argv) {
     lval_del(load);
     //lval_del(stdlib);
     // undefine and delete parsers
-    mpc_cleanup(8, Number, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
+    mpc_cleanup(9, Long, Float, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
     return 0;
 }

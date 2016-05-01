@@ -1156,8 +1156,19 @@ lval* builtin_logic(lenv* e, lval* a, char* op) {
     // else other logic operators expect 2 num args
     if (strcmp(op, "!") == 0) { return builtin_not(e, a); }
     LASSERT_NUM(op, a, 2);
-    LASSERT_TYPE(op, a, 0, LVAL_NUM);
-    LASSERT_TYPE(op, a, 1, LVAL_NUM);
+    // TODO: find a cleaner way to deal with these type checks
+    // maybe deal with type checking
+    LASSERT(a, (a->cell[0]->type == LVAL_LONG ||
+        a->cell[0]->type == LVAL_FLOAT),
+        "Function '%s' passed incorrect type"
+        "Got %s. Expected %s or %s.", op, ltype_name(a->cell[0]->type),
+        ltype_name(LVAL_LONG), ltype_name(LVAL_FLOAT));
+    LASSERT(a, (a->cell[1]->type == LVAL_LONG ||
+        a->cell[1]->type == LVAL_FLOAT),
+        "Function '%s' passed incorrect type"
+        "Got %s. Expected %s or %s.", op, ltype_name(a->cell[1]->type),
+        ltype_name(LVAL_LONG), ltype_name(LVAL_FLOAT));
+
     // TODO: arg amount checking
     int res;
     if (strcmp(op, "||") == 0) {
@@ -1330,7 +1341,8 @@ lval* lval_eval(lenv* e, lval* v) {
 int main(int argc, char** argv) {
     // create some parsers
     // already forward declared
-    Number = mpc_new("number");
+    Long = mpc_new("long");
+    Float = mpc_new("float");
     Symbol = mpc_new("symbol");
     String = mpc_new("string");
     Comment = mpc_new("comment");

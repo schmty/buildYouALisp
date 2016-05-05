@@ -563,7 +563,7 @@ lval* lval_ltof(lval* a) {
             // the val is a float just add it to the list
             // do i need to be popping these?
             vals = lval_add(vals, a->cell[i]);
-            lval_pop(a, 0);
+            lval_pop(a)
         }
     }
     return vals;
@@ -1209,20 +1209,6 @@ lval* builtin_logic(lenv* e, lval* a, char* op) {
 
     // TODO: arg amount checking
     int res;
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type == LVAL_FLOAT) {
-            lval* b = lval_ltof(a);
-            if (strcmp(op, "||") == 0) {
-                res = (b->cell[0]->fnum || b->cell[1]->fnum);
-            }
-            if (strcmp(op, "&&") == 0) {
-                res = (b->cell[0]->fnum && b->cell[1]->fnum);
-            }
-            lval_del(a);
-            lval_del(b);
-            return lval_long(res);
-        }
-    }
     if (strcmp(op, "||") == 0) {
         res = (a->cell[0]->lnum || a->cell[1]->lnum);
     }

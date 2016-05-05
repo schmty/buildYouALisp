@@ -553,59 +553,24 @@ void lenv_def(lenv* e, lval* k, lval* v) {
 
 // long to float conversion
 lval* lval_ltof(lval* a) {
-    lval* vals = lval_sexpr();
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type == LVAL_LONG) {
-            // put val into vals sexpr as a float
-            vals = lval_add(vals, lval_float((float) a->cell[i]->lnum));
-            lval_pop(a, 0);
-        } else {
-            // the val is a float just add it to the list
-            // do i need to be popping these?
-            vals = lval_add(vals, a->cell[i]);
-            lval_pop(a)
-        }
-    }
-    return vals;
-}
-
-lval* lval_float_op(lenv* e, lval* a, char* op) {
-    // create a new lval containing a values all as a float
-
-    lval* vals = lval_ltof(a);
-
-    lval* x = lval_pop(vals, 0);
-
-    while (a->count > 0) {
-        lval* y = lval_pop(vals, 0);
-
-        if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
-        if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
-        if (strcmp(op, "*") == 0) { x->fnum *= y->fnum; }
-        if (strcmp(op, "/") == 0) {
-            if (y->fnum == 0) {
-                lval_del(x);
-                lval_del(y);
-                x = lval_err("Division by Zero!"); break;
-            }
-            x->fnum /= y->fnum;
-        }
-
-        lval_del(y);
-    }
+    lval* val = lval_float((float) a->lnum);
     lval_del(a);
-    lval_del(vals);
-    return x;
+    return val;
 }
 
-// long op descriptions
-lval* lval_long_op(lenv* e, lval* a, char* op) {
+// TODO: builtin op will go here
+lval* builtin_op(lenv* e, lval* a, char* op) {
+    for (int i = 0; i < a->count; i++) {
+        LASSERT2TYPE(op, a, i, LVAL_FLOAT, LVAL_LONG);
+    }
     // pop the first element
     lval* x = lval_pop(a, 0);
 
     // if no arguments and sub the perform unary negation
-    if ((strcmp(op, "-") == 0) && a->count == 0) {
+    if ((strcmp(op, "-") == 0) && a->count == 0 && x->type == LVAL_LONG) {
         x->lnum = -x->lnum;
+    } else if ((strcmp(op, "-") == 0) && a->count == 0 && x->type == LVAL_FLOAT) {
+        x->fnum = -x->fnum;
     }
 
     // while there are still elements remaining
@@ -614,35 +579,75 @@ lval* lval_long_op(lenv* e, lval* a, char* op) {
         // pop the next element
         lval* y = lval_pop(a, 0);
 
-        // using += -= *= /= because of continual looping through list of
-        // multiple arguments
-        if (strcmp(op, "+") == 0) { x->lnum += y->lnum; }
-        if (strcmp(op, "-") == 0) { x->lnum -= y->lnum; }
-        if (strcmp(op, "*") == 0) { x->lnum *= y->lnum; }
-        if (strcmp(op, "/") == 0) {
-            if (y->lnum == 0) {
-                lval_del(x);
-                lval_del(y);
-                x = lval_err("Division by Zero!"); break;
+        if (x->type == LVAL_LONG && y->type == LVAL_LONG) {
+            if (strcmp(op, "+") == 0) { x->lnum += y->lnum; }
+            if (strcmp(op, "-") == 0) { x->lnum -= y->lnum; }
+            if (strcmp(op, "*") == 0) { x->lnum *= y->lnum; }
+            if (strcmp(op, "/") == 0) {
+                if (y->lnum == 0) {
+                    lval_del(x);
+                    lval_del(y);
+                    x = lval_err("Division by Zero!"); break;
+                }
+                x->lnum /= y->lnum;
             }
-            x->lnum /= y->lnum;
+
+            lval_del(y);
         }
 
-        lval_del(y);
+        else if (x->type == LVAL_FLOAT && y->type == LVAL_LONG) {
+            if (strcmp(op, "+") == 0) { x->fnum += y->lnum; }
+            if (strcmp(op, "-") == 0) { x->fnum -= y->lnum; }
+            if (strcmp(op, "*") == 0) { x->fnum *= y->lnum; }
+            if (strcmp(op, "/") == 0) {
+                if (y->lnum == 0) {
+                    lval_del(x);
+                    lval_del(y);
+                    x = lval_err("Division by Zero!"); break;
+                }
+                x->fnum /= y->lnum;
+            }
+
+            lval_del(y);
+        }
+
+        else if (x->type == LVAL_FLOAT && y->type == LVAL_FLOAT) {
+            if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
+            if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
+            if (strcmp(op, "*") == 0) { x->fnum *= y->fnum; }
+            if (strcmp(op, "/") == 0) {
+                if (y->lnum == 0) {
+                    lval_del(x);
+                    lval_del(y);
+                    x = lval_err("Division by Zero!"); break;
+                }
+                x->fnum /= y->fnum;
+            }
+
+            lval_del(y);
+        }
+
+        else if (x->type == LVAL_LONG && y->type == LVAL_FLOAT) {
+            x = lval_ltof(x);
+            if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
+            if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
+            if (strcmp(op, "*") == 0) { x->fnum *= y->fnum; }
+            if (strcmp(op, "/") == 0) {
+                if (y->lnum == 0) {
+                    lval_del(x);
+                    lval_del(y);
+                    x = lval_err("Division by Zero!"); break;
+                }
+                x->fnum /= y->fnum;
+            }
+
+            lval_del(y);
+        }
+
     }
 
     lval_del(a);
     return x;
-}
-
-// TODO: builtin op will go here
-lval* builtin_op(lenv* e, lval* a, char* op) {
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type == LVAL_FLOAT) {
-            return lval_float_op(e, a, op);
-        }
-    }
-    return lval_long_op(e, a, op);
 }
 
 // builtin load
@@ -888,6 +893,11 @@ lval* builtin_cmp(lenv* e, lval* a, char* op) {
     LASSERT2TYPE(op, a, 0, LVAL_FLOAT, LVAL_LONG);
     LASSERT2TYPE(op, a, 1, LVAL_FLOAT, LVAL_LONG);
     // else do long comparisons
+    if (a->cell[0]->type == LVAL_FLOAT && a->cell[1] == LVAL_LONG) {
+        a->cell[1] = lval_ltof(a->cell[1]);
+    } else if (a->cell[0]->type == LVAL_LONG && a->cell[1]->type == LVAL_FLOAT) {
+        a->cell[0] = lval_ltof(a->cell[0]);
+    }
     lval* res;
     if (strcmp(op, "==") == 0) {
         res = lval_long(lval_eq(a->cell[0], a->cell[1]));

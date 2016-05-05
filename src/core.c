@@ -813,7 +813,7 @@ lval* builtin_ord(lenv* e, lval* a, char* op) {
         lval_del(a);
         return lval_long(res);
     } else if (a->cell[0]->type == LVAL_LONG && a->cell[1]->type == LVAL_FLOAT) {
-        a->cell[0] = lval_ltof(a->cell[1]);
+        a->cell[0] = lval_ltof(a->cell[0]);
         if (strcmp(op, ">") == 0) { res = (a->cell[0]->fnum > a->cell[1]->fnum); }
         if (strcmp(op, "<") == 0) { res = (a->cell[0]->fnum < a->cell[1]->fnum); }
         if (strcmp(op, ">=") == 0) { res = (a->cell[0]->fnum >= a->cell[1]->fnum); }

@@ -593,9 +593,7 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
             }
 
             lval_del(y);
-        }
-
-        else if (x->type == LVAL_FLOAT && y->type == LVAL_LONG) {
+        } else if (x->type == LVAL_FLOAT && y->type == LVAL_LONG) {
             if (strcmp(op, "+") == 0) { x->fnum += y->lnum; }
             if (strcmp(op, "-") == 0) { x->fnum -= y->lnum; }
             if (strcmp(op, "*") == 0) { x->fnum *= y->lnum; }
@@ -609,9 +607,7 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
             }
 
             lval_del(y);
-        }
-
-        else if (x->type == LVAL_FLOAT && y->type == LVAL_FLOAT) {
+        } else if (x->type == LVAL_FLOAT && y->type == LVAL_FLOAT) {
             if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
             if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
             if (strcmp(op, "*") == 0) { x->fnum *= y->fnum; }
@@ -625,9 +621,7 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
             }
 
             lval_del(y);
-        }
-
-        else if (x->type == LVAL_LONG && y->type == LVAL_FLOAT) {
+        } else if (x->type == LVAL_LONG && y->type == LVAL_FLOAT) {
             x = lval_ltof(x);
             if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
             if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
@@ -810,26 +804,38 @@ lval* builtin_ord(lenv* e, lval* a, char* op) {
     // binary comparison operators
     // result to be used for storage
     int res;
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type == LVAL_FLOAT) {
-            lval* b = lval_ltof(a);
-            if (strcmp(op, ">") == 0) { res = (b->cell[0]->fnum > b->cell[1]->fnum); }
-            if (strcmp(op, "<") == 0) { res = (b->cell[0]->fnum < b->cell[1]->fnum); }
-            if (strcmp(op, ">=") == 0) { res = (b->cell[0]->fnum >= b->cell[1]->fnum); }
-            if (strcmp(op, "<=") == 0) { res = (b->cell[0]->fnum <= b->cell[1]->fnum); }
-            lval_del(a);
-            lval_del(b);
-            return lval_long(res);
-        }
+    if (a->cell[0]->type == LVAL_FLOAT && a->cell[1]->type == LVAL_LONG) {
+        a->cell[1] = lval_ltof(a->cell[1]);
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->fnum > a->cell[1]->fnum); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->fnum < a->cell[1]->fnum); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->fnum >= a->cell[1]->fnum); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->fnum <= a->cell[1]->fnum); }
+        lval_del(a);
+        return lval_long(res);
+    } else if (a->cell[0]->type == LVAL_LONG && a->cell[1]->type == LVAL_FLOAT) {
+        a->cell[0] = lval_ltof(a->cell[1]);
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->fnum > a->cell[1]->fnum); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->fnum < a->cell[1]->fnum); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->fnum >= a->cell[1]->fnum); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->fnum <= a->cell[1]->fnum); }
+        lval_del(a);
+        return lval_long(res);
+    } else if (a->cell[0]->type == LVAL_FLOAT && a->cell[0]->type == LVAL_FLOAT) {
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->fnum > a->cell[1]->fnum); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->fnum < a->cell[1]->fnum); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->fnum >= a->cell[1]->fnum); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->fnum <= a->cell[1]->fnum); }
+        lval_del(a);
+        return lval_long(res);
+    } else {
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->lnum > a->cell[1]->lnum); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->lnum < a->cell[1]->lnum); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->lnum >= a->cell[1]->lnum); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->lnum <= a->cell[1]->lnum); }
+
+        lval_del(a);
+        return lval_long(res);
     }
-
-    if (strcmp(op, ">") == 0) { res = (a->cell[0]->lnum > a->cell[1]->lnum); }
-    if (strcmp(op, "<") == 0) { res = (a->cell[0]->lnum < a->cell[1]->lnum); }
-    if (strcmp(op, ">=") == 0) { res = (a->cell[0]->lnum >= a->cell[1]->lnum); }
-    if (strcmp(op, "<=") == 0) { res = (a->cell[0]->lnum <= a->cell[1]->lnum); }
-
-    lval_del(a);
-    return lval_long(res);
 }
 
 lval* builtin_gt(lenv* e, lval* a) {
@@ -1190,7 +1196,8 @@ lval* builtin_logic(lenv* e, lval* a, char* op) {
     // else other logic operators expect 2 num args
     if (strcmp(op, "!") == 0) { return builtin_not(e, a); }
     LASSERT_NUM(op, a, 2);
-    LASSERT_TYPE(op, a, LVAL_LONG);
+    LASSERT_TYPE(op, a, 0, LVAL_LONG);
+    LASSERT_TYPE(op, a, 1, LVAL_LONG);
 
     // TODO: arg amount checking
     int res;

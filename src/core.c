@@ -1190,18 +1190,7 @@ lval* builtin_logic(lenv* e, lval* a, char* op) {
     // else other logic operators expect 2 num args
     if (strcmp(op, "!") == 0) { return builtin_not(e, a); }
     LASSERT_NUM(op, a, 2);
-    // TODO: find a cleaner way to deal with these type checks
-    // maybe deal with type checking
-    LASSERT(a, (a->cell[0]->type == LVAL_LONG ||
-        a->cell[0]->type == LVAL_FLOAT),
-        "Function '%s' passed incorrect type"
-        "Got %s. Expected %s or %s.", op, ltype_name(a->cell[0]->type),
-        ltype_name(LVAL_LONG), ltype_name(LVAL_FLOAT));
-    LASSERT(a, (a->cell[1]->type == LVAL_LONG ||
-        a->cell[1]->type == LVAL_FLOAT),
-        "Function '%s' passed incorrect type"
-        "Got %s. Expected %s or %s.", op, ltype_name(a->cell[1]->type),
-        ltype_name(LVAL_LONG), ltype_name(LVAL_FLOAT));
+    LASSERT_TYPE(op, a, LVAL_LONG);
 
     // TODO: arg amount checking
     int res;

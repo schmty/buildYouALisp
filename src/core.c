@@ -885,22 +885,8 @@ int lval_eq(lval* a, lval* b) {
 
 lval* builtin_cmp(lenv* e, lval* a, char* op) {
     LASSERT_NUM(op, a, 2);
-    for (int i = 0; i < a->count; i++) {
-        if (a->cell[i]->type == LVAL_FLOAT) {
-            // if there is a float cast both args to float and return the result
-            lval* b = lval_ltof(a);
-            // TODO: clean this up later
-            lval* res;
-            if (strcmp(op, "==") == 0) {
-                res = lval_long(lval_eq(b->cell[0], b->cell[1]));
-            } else {
-                res = lval_long(!(lval_eq(b->cell[0], b->cell[1])));
-            }
-            lval_del(a);
-            lval_del(b);
-            return res;
-        }
-    }
+    LASSERT2TYPE(op, a, 0, LVAL_FLOAT, LVAL_LONG);
+    LASSERT2TYPE(op, a, 1, LVAL_FLOAT, LVAL_LONG);
     // else do long comparisons
     lval* res;
     if (strcmp(op, "==") == 0) {

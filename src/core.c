@@ -1,4 +1,5 @@
 #include "lib/mpc.h"
+#include <math.h>
 
 // windows stuff
 #ifdef _WIN32
@@ -1409,7 +1410,7 @@ int main(int argc, char** argv) {
             "                                                                                     \
             float    : /-?[0-9]+\\.?[0-9]+/ ;                                                     \
             int      : /-?[0-9]+/ ;                                                               \
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|%]+/;                                         \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|%^]+/;                                       \
             string   : /\"(\\\\.|[^\"])*\"/ ;                                                     \
             comment  : /;[^\\r\\n]*/ ;                                                            \
             sexpr    : '(' <expr>* ')' ;                                                          \

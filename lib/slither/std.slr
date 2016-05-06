@@ -30,6 +30,15 @@
     {last l}
 })
 
+;;; Math Functions
+
+; Power
+(defn {^ b e} {
+  if (== e 1)
+    {b}
+    {(* (* b b) (- e 1))}
+})
+
 ; Open new scope
 (defn {let b} {
   ((fn {_} b) ())

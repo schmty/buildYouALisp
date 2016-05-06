@@ -71,7 +71,7 @@ lval* lval_eval(lenv* e, lval* v);
 
 // FORWARD PARSER DECLARATIONS
 mpc_parser_t* Float;
-mpc_parser_t* Long;
+mpc_parser_t* Int;
 mpc_parser_t* Symbol;
 mpc_parser_t* String;
 mpc_parser_t* Comment;
@@ -82,7 +82,7 @@ mpc_parser_t* Slither;
 
 // possible lval types enum
 // TODO: Make LVAL_BOOL type
-enum { LVAL_LONG, LVAL_FLOAT, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR, LVAL_FUN, LVAL_STR };
+enum { LVAL_INT, LVAL_FLOAT, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR, LVAL_FUN, LVAL_STR };
 
 // possible error types
 enum { LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM };
@@ -94,8 +94,8 @@ struct lval {
     int type;
 
     // Basic
-    long lnum;
-    float fnum;
+    int integer;
+    float ffloat;
     char* err;
     char* sym;
     char* str;
@@ -123,7 +123,7 @@ struct lenv {
 char* ltype_name(int t) {
     switch(t) {
         case LVAL_FUN: return "Function";
-        case LVAL_LONG: return "Long";
+        case LVAL_INT: return "Int";
         case LVAL_FLOAT: return "Float";
         case LVAL_ERR: return "Error";
         case LVAL_SYM: return "Symbol";
@@ -148,7 +148,7 @@ void lval_del(lval* v) {
     switch (v->type) {
         // do nothing for a number type or function type
         case LVAL_FLOAT:
-        case LVAL_LONG: break;
+        case LVAL_INT: break;
         case LVAL_FUN:
             if (!v->builtin) {
                 lenv_del(v->env);
@@ -232,17 +232,17 @@ lval* lval_str(char* s) {
 }
 
 // construct a pointer to a new long type lval
-lval* lval_long(long x) {
+lval* lval_int(int x) {
     lval* v = malloc(sizeof(lval));
-    v->type = LVAL_LONG;
-    v->lnum = x;
+    v->type = LVAL_INT;
+    v->integer = x;
     return v;
 }
 
 lval* lval_float(float x) {
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_FLOAT;
-    v->fnum = x;
+    v->ffloat = x;
     return v;
 }
 
@@ -298,11 +298,11 @@ lval* lval_qexpr(void) {
 }
 
 // lval read num
-lval* lval_read_long(mpc_ast_t* t) {
+lval* lval_read_int(mpc_ast_t* t) {
     errno = 0;
-    long x = strtol(t->contents, NULL, 10);
+    int x = strtol(t->contents, NULL, 10);
     return errno != ERANGE ?
-        lval_long(x) : lval_err("invalid long");
+        lval_int(x) : lval_err("invalid long");
 }
 
 // lval read float
@@ -331,7 +331,7 @@ lval* lval_read_str(mpc_ast_t* t) {
 // lval read
 lval* lval_read(mpc_ast_t* t) {
     // if symbol or number return conversion to that type
-    if (strstr(t->tag, "long")) { return lval_read_long(t); }
+    if (strstr(t->tag, "int")) { return lval_read_int(t); }
     if (strstr(t->tag, "float")) { return lval_read_float(t); }
     if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
 
@@ -392,8 +392,8 @@ void lval_print_str(lval* v) {
 // print an lval
 void lval_print(lval* v) {
     switch (v->type) {
-        case LVAL_LONG: printf("%li", v->lnum); break;
-        case LVAL_FLOAT: printf("%f", v->fnum); break;
+        case LVAL_INT: printf("%i", v->integer); break;
+        case LVAL_FLOAT: printf("%f", v->ffloat); break;
         case LVAL_FUN:
             if (v->builtin) {
                 printf("<builtin>");
@@ -454,8 +454,8 @@ lval* lval_copy(lval* v) {
                 x->body = lval_copy(v->body);
             }
         break;
-        case LVAL_LONG: x->lnum = v->lnum; break;
-        case LVAL_FLOAT: x->fnum = v->fnum; break;
+        case LVAL_INT: x->integer = v->integer; break;
+        case LVAL_FLOAT: x->ffloat = v->ffloat; break;
 
         // copy strings using malloc and strcpy
         case LVAL_ERR:
@@ -551,9 +551,9 @@ void lenv_def(lenv* e, lval* k, lval* v) {
     lenv_put(e, k, v);
 }
 
-// long to float conversion
-lval* lval_ltof(lval* a) {
-    lval* val = lval_float((float) a->lnum);
+// int to float conversion
+lval* lval_itof(lval* a) {
+    lval* val = lval_float((float) a->integer);
     lval_del(a);
     return val;
 }
@@ -561,16 +561,16 @@ lval* lval_ltof(lval* a) {
 // TODO: builtin op will go here
 lval* builtin_op(lenv* e, lval* a, char* op) {
     for (int i = 0; i < a->count; i++) {
-        LASSERT2TYPE(op, a, i, LVAL_FLOAT, LVAL_LONG);
+        LASSERT2TYPE(op, a, i, LVAL_FLOAT, LVAL_INT);
     }
     // pop the first element
     lval* x = lval_pop(a, 0);
 
     // if no arguments and sub the perform unary negation
-    if ((strcmp(op, "-") == 0) && a->count == 0 && x->type == LVAL_LONG) {
-        x->lnum = -x->lnum;
+    if ((strcmp(op, "-") == 0) && a->count == 0 && x->type == LVAL_INT) {
+        x->integer = -x->integer;
     } else if ((strcmp(op, "-") == 0) && a->count == 0 && x->type == LVAL_FLOAT) {
-        x->fnum = -x->fnum;
+        x->ffloat = -x->ffloat;
     }
 
     // while there are still elements remaining
@@ -579,60 +579,60 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
         // pop the next element
         lval* y = lval_pop(a, 0);
 
-        if (x->type == LVAL_LONG && y->type == LVAL_LONG) {
-            if (strcmp(op, "+") == 0) { x->lnum += y->lnum; }
-            if (strcmp(op, "-") == 0) { x->lnum -= y->lnum; }
-            if (strcmp(op, "*") == 0) { x->lnum *= y->lnum; }
+        if (x->type == LVAL_INT && y->type == LVAL_INT) {
+            if (strcmp(op, "+") == 0) { x->integer += y->integer; }
+            if (strcmp(op, "-") == 0) { x->integer -= y->integer; }
+            if (strcmp(op, "*") == 0) { x->integer *= y->integer; }
             if (strcmp(op, "/") == 0) {
-                if (y->lnum == 0) {
+                if (y->integer == 0) {
                     lval_del(x);
                     lval_del(y);
                     x = lval_err("Division by Zero!"); break;
                 }
-                x->lnum /= y->lnum;
+                x->integer /= y->integer;
             }
 
             lval_del(y);
-        } else if (x->type == LVAL_FLOAT && y->type == LVAL_LONG) {
-            if (strcmp(op, "+") == 0) { x->fnum += y->lnum; }
-            if (strcmp(op, "-") == 0) { x->fnum -= y->lnum; }
-            if (strcmp(op, "*") == 0) { x->fnum *= y->lnum; }
+        } else if (x->type == LVAL_FLOAT && y->type == LVAL_INT) {
+            if (strcmp(op, "+") == 0) { x->ffloat += y->integer; }
+            if (strcmp(op, "-") == 0) { x->ffloat -= y->integer; }
+            if (strcmp(op, "*") == 0) { x->ffloat *= y->integer; }
             if (strcmp(op, "/") == 0) {
-                if (y->lnum == 0) {
+                if (y->integer == 0) {
                     lval_del(x);
                     lval_del(y);
                     x = lval_err("Division by Zero!"); break;
                 }
-                x->fnum /= y->lnum;
+                x->ffloat /= y->integer;
             }
 
             lval_del(y);
         } else if (x->type == LVAL_FLOAT && y->type == LVAL_FLOAT) {
-            if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
-            if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
-            if (strcmp(op, "*") == 0) { x->fnum *= y->fnum; }
+            if (strcmp(op, "+") == 0) { x->ffloat += y->ffloat; }
+            if (strcmp(op, "-") == 0) { x->ffloat -= y->ffloat; }
+            if (strcmp(op, "*") == 0) { x->ffloat *= y->ffloat; }
             if (strcmp(op, "/") == 0) {
-                if (y->lnum == 0) {
+                if (y->integer == 0) {
                     lval_del(x);
                     lval_del(y);
                     x = lval_err("Division by Zero!"); break;
                 }
-                x->fnum /= y->fnum;
+                x->ffloat /= y->ffloat;
             }
 
             lval_del(y);
-        } else if (x->type == LVAL_LONG && y->type == LVAL_FLOAT) {
-            x = lval_ltof(x);
-            if (strcmp(op, "+") == 0) { x->fnum += y->fnum; }
-            if (strcmp(op, "-") == 0) { x->fnum -= y->fnum; }
-            if (strcmp(op, "*") == 0) { x->fnum *= y->fnum; }
+        } else if (x->type == LVAL_INT && y->type == LVAL_FLOAT) {
+            x = lval_itof(x);
+            if (strcmp(op, "+") == 0) { x->ffloat += y->ffloat; }
+            if (strcmp(op, "-") == 0) { x->ffloat -= y->ffloat; }
+            if (strcmp(op, "*") == 0) { x->ffloat *= y->ffloat; }
             if (strcmp(op, "/") == 0) {
-                if (y->lnum == 0) {
+                if (y->integer == 0) {
                     lval_del(x);
                     lval_del(y);
                     x = lval_err("Division by Zero!"); break;
                 }
-                x->fnum /= y->fnum;
+                x->ffloat /= y->ffloat;
             }
 
             lval_del(y);
@@ -772,9 +772,9 @@ lval* builtin_len(lenv* e, lval* a) {
     if (a->cell[0]->type == LVAL_STR) {
         int size = (int) strlen(a->cell[0]->str);
         lval_del(a);
-        return lval_long(size);
+        return lval_int(size);
     }
-    lval* x = lval_long(a->cell[0]->count);
+    lval* x = lval_int(a->cell[0]->count);
     // @TODO: should I delete a?
     // TODO: really see if deleting a is needed
     // I don't think so because we might still need it?
@@ -799,42 +799,42 @@ lval* builtin_show(lenv* e, lval* a) {
 // will return a 1 or a 0 as an lval_num
 lval* builtin_ord(lenv* e, lval* a, char* op) {
     LASSERT_NUM(op, a, 2);
-    LASSERT2TYPE(op, a, 0, LVAL_LONG, LVAL_FLOAT);
-    LASSERT2TYPE(op, a, 1, LVAL_LONG, LVAL_FLOAT);
+    LASSERT2TYPE(op, a, 0, LVAL_INT, LVAL_FLOAT);
+    LASSERT2TYPE(op, a, 1, LVAL_INT, LVAL_FLOAT);
     // binary comparison operators
     // result to be used for storage
     int res;
-    if (a->cell[0]->type == LVAL_FLOAT && a->cell[1]->type == LVAL_LONG) {
-        a->cell[1] = lval_ltof(a->cell[1]);
-        if (strcmp(op, ">") == 0) { res = (a->cell[0]->fnum > a->cell[1]->fnum); }
-        if (strcmp(op, "<") == 0) { res = (a->cell[0]->fnum < a->cell[1]->fnum); }
-        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->fnum >= a->cell[1]->fnum); }
-        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->fnum <= a->cell[1]->fnum); }
+    if (a->cell[0]->type == LVAL_FLOAT && a->cell[1]->type == LVAL_INT) {
+        a->cell[1] = lval_itof(a->cell[1]);
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->ffloat > a->cell[1]->ffloat); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->ffloat < a->cell[1]->ffloat); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->ffloat >= a->cell[1]->ffloat); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->ffloat <= a->cell[1]->ffloat); }
         lval_del(a);
-        return lval_long(res);
-    } else if (a->cell[0]->type == LVAL_LONG && a->cell[1]->type == LVAL_FLOAT) {
-        a->cell[0] = lval_ltof(a->cell[0]);
-        if (strcmp(op, ">") == 0) { res = (a->cell[0]->fnum > a->cell[1]->fnum); }
-        if (strcmp(op, "<") == 0) { res = (a->cell[0]->fnum < a->cell[1]->fnum); }
-        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->fnum >= a->cell[1]->fnum); }
-        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->fnum <= a->cell[1]->fnum); }
+        return lval_int(res);
+    } else if (a->cell[0]->type == LVAL_INT && a->cell[1]->type == LVAL_FLOAT) {
+        a->cell[0] = lval_itof(a->cell[0]);
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->ffloat > a->cell[1]->ffloat); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->ffloat < a->cell[1]->ffloat); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->ffloat >= a->cell[1]->ffloat); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->ffloat <= a->cell[1]->ffloat); }
         lval_del(a);
-        return lval_long(res);
+        return lval_int(res);
     } else if (a->cell[0]->type == LVAL_FLOAT && a->cell[0]->type == LVAL_FLOAT) {
-        if (strcmp(op, ">") == 0) { res = (a->cell[0]->fnum > a->cell[1]->fnum); }
-        if (strcmp(op, "<") == 0) { res = (a->cell[0]->fnum < a->cell[1]->fnum); }
-        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->fnum >= a->cell[1]->fnum); }
-        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->fnum <= a->cell[1]->fnum); }
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->ffloat > a->cell[1]->ffloat); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->ffloat < a->cell[1]->ffloat); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->ffloat >= a->cell[1]->ffloat); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->ffloat <= a->cell[1]->ffloat); }
         lval_del(a);
-        return lval_long(res);
+        return lval_int(res);
     } else {
-        if (strcmp(op, ">") == 0) { res = (a->cell[0]->lnum > a->cell[1]->lnum); }
-        if (strcmp(op, "<") == 0) { res = (a->cell[0]->lnum < a->cell[1]->lnum); }
-        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->lnum >= a->cell[1]->lnum); }
-        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->lnum <= a->cell[1]->lnum); }
+        if (strcmp(op, ">") == 0) { res = (a->cell[0]->integer > a->cell[1]->integer); }
+        if (strcmp(op, "<") == 0) { res = (a->cell[0]->integer < a->cell[1]->integer); }
+        if (strcmp(op, ">=") == 0) { res = (a->cell[0]->integer >= a->cell[1]->integer); }
+        if (strcmp(op, "<=") == 0) { res = (a->cell[0]->integer <= a->cell[1]->integer); }
 
         lval_del(a);
-        return lval_long(res);
+        return lval_int(res);
     }
 }
 
@@ -859,11 +859,11 @@ int lval_eq(lval* a, lval* b) {
     // if types do not line up then return 0 (false)
     if (a->type != b->type) { return 0; }
     switch (a->type) {
-        case LVAL_LONG:
-            return (a->lnum == b->lnum);
+        case LVAL_INT:
+            return (a->integer == b->integer);
         break;
         case LVAL_FLOAT:
-            return (a->fnum == b->fnum);
+            return (a->ffloat == b->ffloat);
         case LVAL_SYM:
             return (a->sym == b->sym);
         break;
@@ -896,19 +896,19 @@ int lval_eq(lval* a, lval* b) {
 
 lval* builtin_cmp(lenv* e, lval* a, char* op) {
     LASSERT_NUM(op, a, 2);
-    LASSERT2TYPE(op, a, 0, LVAL_FLOAT, LVAL_LONG);
-    LASSERT2TYPE(op, a, 1, LVAL_FLOAT, LVAL_LONG);
+    LASSERT2TYPE(op, a, 0, LVAL_FLOAT, LVAL_INT);
+    LASSERT2TYPE(op, a, 1, LVAL_FLOAT, LVAL_INT);
     // else do long comparisons
-    if (a->cell[0]->type == LVAL_FLOAT && a->cell[1] == LVAL_LONG) {
-        a->cell[1] = lval_ltof(a->cell[1]);
-    } else if (a->cell[0]->type == LVAL_LONG && a->cell[1]->type == LVAL_FLOAT) {
-        a->cell[0] = lval_ltof(a->cell[0]);
+    if (a->cell[0]->type == LVAL_FLOAT && a->cell[1] == LVAL_INT) {
+        a->cell[1] = lval_itof(a->cell[1]);
+    } else if (a->cell[0]->type == LVAL_INT && a->cell[1]->type == LVAL_FLOAT) {
+        a->cell[0] = lval_itof(a->cell[0]);
     }
     lval* res;
     if (strcmp(op, "==") == 0) {
-        res = lval_long(lval_eq(a->cell[0], a->cell[1]));
+        res = lval_int(lval_eq(a->cell[0], a->cell[1]));
     } else {
-        res = lval_long(!lval_eq(a->cell[0], a->cell[1]));
+        res = lval_int(!lval_eq(a->cell[0], a->cell[1]));
     }
     lval_del(a);
     return res;
@@ -941,7 +941,7 @@ lval* builtin_eval(lenv* e, lval* a) {
 
 lval* builtin_if(lenv* e, lval* a) {
     LASSERT_NUM("if", a, 3);
-    LASSERT2TYPE("if", a, 0, LVAL_LONG, LVAL_FLOAT)
+    LASSERT2TYPE("if", a, 0, LVAL_INT, LVAL_FLOAT)
     LASSERT_TYPE("if", a, 1, LVAL_QEXPR);
     LASSERT_TYPE("if", a, 2, LVAL_QEXPR);
 
@@ -952,8 +952,7 @@ lval* builtin_if(lenv* e, lval* a) {
     a->cell[1]->type = LVAL_SEXPR;
     a->cell[2]->type = LVAL_SEXPR;
 
-    // TODO: this will break, need to emulate generics or something.
-    if (a->cell[0]->lnum) {
+    if (a->cell[0]->integer) {
         result = lval_eval(e, lval_pop(a, 1));
     } else {
         result = lval_eval(e, lval_pop(a, 2));
@@ -1185,30 +1184,30 @@ lval* builtin_var(lenv* e, lval* a, char* func) {
 lval* builtin_not(lenv* e, lval* a) {
     // if '!' operator expect 1 arg of num type
     LASSERT_NUM("!", a, 1);
-    LASSERT_TYPE("!", a, 0, LVAL_LONG);
+    LASSERT_TYPE("!", a, 0, LVAL_INT);
     int res;
-    res = !(a->cell[0]->lnum);
+    res = !(a->cell[0]->integer);
     lval_del(a);
-    return lval_long(res);
+    return lval_int(res);
 }
 
 lval* builtin_logic(lenv* e, lval* a, char* op) {
     // else other logic operators expect 2 num args
     if (strcmp(op, "!") == 0) { return builtin_not(e, a); }
     LASSERT_NUM(op, a, 2);
-    LASSERT_TYPE(op, a, 0, LVAL_LONG);
-    LASSERT_TYPE(op, a, 1, LVAL_LONG);
+    LASSERT_TYPE(op, a, 0, LVAL_INT);
+    LASSERT_TYPE(op, a, 1, LVAL_INT);
 
     // TODO: arg amount checking
     int res;
     if (strcmp(op, "||") == 0) {
-        res = (a->cell[0]->lnum || a->cell[1]->lnum);
+        res = (a->cell[0]->integer || a->cell[1]->integer);
     }
     if (strcmp(op, "&&") == 0) {
-        res = (a->cell[0]->lnum && a->cell[1]->lnum);
+        res = (a->cell[0]->integer && a->cell[1]->integer);
     }
     lval_del(a);
-    return lval_long(res);
+    return lval_int(res);
 }
 
 lval* builtin_or(lenv* e, lval* a) {
@@ -1371,7 +1370,7 @@ lval* lval_eval(lenv* e, lval* v) {
 int main(int argc, char** argv) {
     // create some parsers
     // already forward declared
-    Long = mpc_new("long");
+    Int = mpc_new("int");
     Float = mpc_new("float");
     Symbol = mpc_new("symbol");
     String = mpc_new("string");
@@ -1385,16 +1384,16 @@ int main(int argc, char** argv) {
     mpca_lang(MPCA_LANG_DEFAULT,
             "                                                                                     \
             float    : /-?[0-9]+\\.?[0-9]+/ ;                                                     \
-            long     : /-?[0-9]+/ ;                                                               \
+            int      : /-?[0-9]+/ ;                                                               \
             symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                                         \
             string   : /\"(\\\\.|[^\"])*\"/ ;                                                     \
             comment  : /;[^\\r\\n]*/ ;                                                            \
             sexpr    : '(' <expr>* ')' ;                                                          \
             qexpr    : '{' <expr>* '}' ;                                                          \
-            expr     : <float> | <long> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;   \
+            expr     : <float> | <int> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;   \
             slither  : /^/ <expr>* /$/ ;                                                          \
             ",
-            Float, Long, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
+            Float, Int, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
 
     // create environment
     lenv* e = lenv_new();
@@ -1462,6 +1461,6 @@ int main(int argc, char** argv) {
     lval_del(load);
     //lval_del(stdlib);
     // undefine and delete parsers
-    mpc_cleanup(9, Float, Long, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
+    mpc_cleanup(9, Float, Int, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
     return 0;
 }

@@ -1384,7 +1384,7 @@ int main(int argc, char** argv) {
     // define them with the following language
     mpca_lang(MPCA_LANG_DEFAULT,
             "                                                                                     \
-            float    : /-?[0-9]+\\.?[0-9]+/ ;                                                              \
+            float    : /-?[0-9]+\\.?[0-9]+/ ;                                                     \
             long     : /-?[0-9]+/ ;                                                               \
             symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                                         \
             string   : /\"(\\\\.|[^\"])*\"/ ;                                                     \
@@ -1411,7 +1411,7 @@ int main(int argc, char** argv) {
     // interactive prompt
     if (argc == 1) {
         /* Print version and exit info */
-        puts("Slither version 0.1.1");
+        puts("Slither version 0.1.0");
         puts("Press ctrl+c to exit\n");
 
         while (1) {

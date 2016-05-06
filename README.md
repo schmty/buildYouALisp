@@ -8,8 +8,8 @@ To run the slither repl follow these steps
 clone the repo and then run these commands
 
 ```
-$ make
-$ ./bin/slither
+$ make install
+$ slither
 ```
 
 and you should be good to go!

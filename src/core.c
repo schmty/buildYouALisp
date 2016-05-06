@@ -583,6 +583,7 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
             if (strcmp(op, "+") == 0) { x->integer += y->integer; }
             if (strcmp(op, "-") == 0) { x->integer -= y->integer; }
             if (strcmp(op, "*") == 0) { x->integer *= y->integer; }
+            if (strcmp(op, "%") == 0) { x->integer %= y->integer; }
             if (strcmp(op, "/") == 0) {
                 if (y->integer == 0) {
                     lval_del(x);
@@ -597,6 +598,12 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
             if (strcmp(op, "+") == 0) { x->ffloat += y->integer; }
             if (strcmp(op, "-") == 0) { x->ffloat -= y->integer; }
             if (strcmp(op, "*") == 0) { x->ffloat *= y->integer; }
+            if (strcmp(op, "%") == 0) {
+                lval_del(x);
+                lval_del(y);
+                x = lval_err("Modulus only works on Integers!");
+                break;
+            }
             if (strcmp(op, "/") == 0) {
                 if (y->integer == 0) {
                     lval_del(x);
@@ -611,6 +618,12 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
             if (strcmp(op, "+") == 0) { x->ffloat += y->ffloat; }
             if (strcmp(op, "-") == 0) { x->ffloat -= y->ffloat; }
             if (strcmp(op, "*") == 0) { x->ffloat *= y->ffloat; }
+            if (strcmp(op, "%") == 0) {
+                lval_del(x);
+                lval_del(y);
+                x = lval_err("Modulus only works on Integers!");
+                break;
+            }
             if (strcmp(op, "/") == 0) {
                 if (y->integer == 0) {
                     lval_del(x);
@@ -626,6 +639,12 @@ lval* builtin_op(lenv* e, lval* a, char* op) {
             if (strcmp(op, "+") == 0) { x->ffloat += y->ffloat; }
             if (strcmp(op, "-") == 0) { x->ffloat -= y->ffloat; }
             if (strcmp(op, "*") == 0) { x->ffloat *= y->ffloat; }
+            if (strcmp(op, "%") == 0) {
+                lval_del(x);
+                lval_del(y);
+                x = lval_err("Modulus only works on Integers!");
+                break;
+            }
             if (strcmp(op, "/") == 0) {
                 if (y->integer == 0) {
                     lval_del(x);
@@ -700,6 +719,10 @@ lval* builtin_mul(lenv* e, lval* a) {
 
 lval* builtin_div(lenv* e, lval* a) {
     return builtin_op(e, a, "/");
+}
+
+lval* builtin_mod(lenv* e, lval* a) {
+    return builtin_op(e, a, "%");
 }
 
 lval* builtin_head(lenv* e, lval* a) {
@@ -1277,6 +1300,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "-", builtin_sub);
     lenv_add_builtin(e, "*", builtin_mul);
     lenv_add_builtin(e, "/", builtin_div);
+    lenv_add_builtin(e, "%", builtin_mod);
 
     // variable functions
     lenv_add_builtin(e, "fn", builtin_lambda);
@@ -1385,12 +1409,12 @@ int main(int argc, char** argv) {
             "                                                                                     \
             float    : /-?[0-9]+\\.?[0-9]+/ ;                                                     \
             int      : /-?[0-9]+/ ;                                                               \
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|]+/;                                         \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|%]+/;                                         \
             string   : /\"(\\\\.|[^\"])*\"/ ;                                                     \
             comment  : /;[^\\r\\n]*/ ;                                                            \
             sexpr    : '(' <expr>* ')' ;                                                          \
             qexpr    : '{' <expr>* '}' ;                                                          \
-            expr     : <float> | <int> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;   \
+            expr     : <float> | <int> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;    \
             slither  : /^/ <expr>* /$/ ;                                                          \
             ",
             Float, Int, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);

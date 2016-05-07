@@ -1277,6 +1277,21 @@ lval* builtin_error(lenv* e, lval* a) {
     return err;
 }
 
+// Builtin import
+// TODO: not sure if this will work
+lval* builtin_import(lenv* e, lval* a) {
+    LASSERT_NUM("import", a, 1);
+    LASSERT_TYPE("import", a, 0, LVAL_STR);
+
+    // the path to all system slither libraries
+    char* syslib_path = "/usr/local/lib/";
+    char* import_file = malloc(strlen(syslib_path) + strlen(a->cell[0]->str)+1);
+    strcpy(import_file, syslib_path);
+    strcat(import_file, a->cell[0]->str);
+    // TODO: free the strings?
+    return builtin_load(e, import_file);
+}
+
 // add builtin functions to the environment
 void lenv_add_builtin(lenv* e, char* name, lbuiltin func) {
     lval* k = lval_sym(name);

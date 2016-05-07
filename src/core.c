@@ -1456,7 +1456,7 @@ int main(int argc, char** argv) {
     // interactive prompt
     if (argc == 1) {
         /* Print version and exit info */
-        puts("Slither version 0.2.1");
+        puts("Slither version 0.2.2");
         puts("Press ctrl+c to exit\n");
 
         while (1) {

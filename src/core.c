@@ -1428,16 +1428,16 @@ int main(int argc, char** argv) {
 
     // define them with the following language
     mpca_lang(MPCA_LANG_DEFAULT,
-            "                                                                                     \
-            float    : /-?[0-9]+\\.?[0-9]+/ ;                                                     \
-            int      : /-?[0-9]+/ ;                                                               \
-            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|%^]+/;                                       \
-            string   : /\"(\\\\.|[^\"])*\"/ ;                                                     \
-            comment  : /;[^\\r\\n]*/ ;                                                            \
-            sexpr    : '(' <expr>* ')' ;                                                          \
-            qexpr    : '{' <expr>* '}' ;                                                          \
-            expr     : <float> | <int> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ;    \
-            slither  : /^/ <expr>* /$/ ;                                                          \
+            "                                                                                  \
+            float    : /-?[0-9]+\\.?[0-9]+/ ;                                                  \
+            int      : /-?[0-9]+/ ;                                                            \
+            symbol   : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&|%^]+/;                                    \
+            string   : /\"(\\\\.|[^\"])*\"/ ;                                                  \
+            comment  : /;[^\\r\\n]*/ ;                                                         \
+            sexpr    : '(' <expr>* ')' ;                                                       \
+            qexpr    : '{' <expr>* '}' ;                                                       \
+            expr     : <float> | <int> | <symbol> | <sexpr> | <qexpr> | <string> | <comment> ; \
+            slither  : /^/ <expr>* /$/ ;                                                       \
             ",
             Float, Int, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);
 

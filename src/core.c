@@ -1278,18 +1278,21 @@ lval* builtin_error(lenv* e, lval* a) {
 }
 
 // Builtin import
-// TODO: not sure if this will work
+// TODO: adapt this to use user created files with relative filepaths
 lval* builtin_import(lenv* e, lval* a) {
     LASSERT_NUM("import", a, 1);
     LASSERT_TYPE("import", a, 0, LVAL_STR);
 
     // the path to all system slither libraries
-    char* syslib_path = "/usr/local/lib/";
-    char* import_file = malloc(strlen(syslib_path) + strlen(a->cell[0]->str)+1);
+    char* syslib_path = "/usr/local/lib/slither/";
+    char* import_file = malloc(strlen(syslib_path) + strlen(a->cell[0]->str)+5); // + 5 for .slr and null term
     strcpy(import_file, syslib_path);
     strcat(import_file, a->cell[0]->str);
+    strcat(import_file, ".slr");
+    lval* file = lval_add(lval_sexpr(), lval_str(import_file));
+    lval_del(a);
     // TODO: free the strings?
-    return builtin_load(e, import_file);
+    return builtin_load(e, file);
 }
 
 // add builtin functions to the environment
@@ -1322,6 +1325,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "fn", builtin_lambda);
     lenv_add_builtin(e, "def", builtin_def);
     lenv_add_builtin(e, "=", builtin_put);
+    lenv_add_builtin(e, "import", builtin_import);
 
     // comparison functions
     lenv_add_builtin(e, ">", builtin_gt);
@@ -1346,6 +1350,7 @@ void lenv_add_builtins(lenv* e) {
     lenv_add_builtin(e, "show", builtin_show);
 }
 
+// TODO: do i still need this function?
 lval* builtin(lenv* e, lval* a, char* func) {
     if (strcmp("list", func) == 0) { return builtin_list(e, a); }
     if (strcmp("head", func) == 0) { return builtin_head(e, a); }
@@ -1354,7 +1359,8 @@ lval* builtin(lenv* e, lval* a, char* func) {
     if (strcmp("eval", func) == 0) { return builtin_eval(e, a); }
     if (strcmp("cons", func) == 0) { return builtin_cons(e, a); }
     if (strcmp("len", func) == 0) { return builtin_len(e, a); }
-    if (strstr("+-/*", func)) { return builtin_op(e, a, func); }
+    if (strcmp("import", func) == 0) { return builtin_import(e, a); }
+    if (strstr("+-/*%", func)) { return builtin_op(e, a, func); }
     lval_del(a);
     return lval_err("Unknown Function!");
 }

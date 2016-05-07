@@ -1426,7 +1426,7 @@ int main(int argc, char** argv) {
 
     // load std lib no matter prompt or file loaded
     // NOTE this filepath is relative to the slither binary
-    lval* stdlib = lval_add(lval_sexpr(), lval_str("/Users/jake/Projects/slither/lib/slither/std.slr"));
+    lval* stdlib = lval_add(lval_sexpr(), lval_str("/usr/local/lib/slither/std.slr"));
     lval* load = builtin_load(e, stdlib);
     if (load->type == LVAL_ERR) {
         lval_println(load);

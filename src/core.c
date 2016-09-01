@@ -550,6 +550,7 @@ void lenv_def(lenv* e, lval* k, lval* v) {
         e = e->par;
     }
     // put value in e
+    printf("Before segfault?");
     lenv_put(e, k, v);
 }
 
@@ -1176,7 +1177,7 @@ lval* builtin_lambda(lenv* e, lval* a) {
 }
 
 lval* builtin_var(lenv* e, lval* a, char* func) {
-    LASSERT_TYPE(func, a, 0, LVAL_SYM);
+    LASSERT_TYPE(func, a, 0, LVAL_FUN);
 
     lval* sym = a;
     sym->ctx = "def";
@@ -1191,7 +1192,7 @@ lval* builtin_var(lenv* e, lval* a, char* func) {
             lenv_put(e, sym, a);
         }
 
-    lval_del(a);
+        //lval_del(a);
     return lval_sexpr();
 }
 
@@ -1373,7 +1374,7 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
     // single expression
     if (v->count == 1) { return lval_take(v, 0); }
 
-    // ensure first element is symbol
+    // ensure first element is function? 
     lval* f = lval_pop(v, 0);
     if (f->type != LVAL_FUN) {
         lval* err = lval_err(
@@ -1437,12 +1438,12 @@ int main(int argc, char** argv) {
 
     // load std lib no matter prompt or file loaded
     // NOTE this filepath is relative to the slither binary
-    lval* stdlib = lval_add(lval_sexpr(), lval_str("/usr/local/lib/slither/std.slr"));
-    lval* load = builtin_load(e, stdlib);
-    if (load->type == LVAL_ERR) {
-        lval_println(load);
-        lval_del(load);
-    }
+    //lval* stdlib = lval_add(lval_sexpr(), lval_str("/usr/local/lib/slither/std.slr"));
+    //lval* load = builtin_load(e, stdlib);
+    //if (load->type == LVAL_ERR) {
+    //   lval_println(load);
+    //   lval_del(load);
+    //}
     // interactive prompt
     if (argc == 1) {
         /* Print version and exit info */
@@ -1494,7 +1495,7 @@ int main(int argc, char** argv) {
     }
 
     lenv_del(e);
-    lval_del(load);
+    //lval_del(load);
     //lval_del(stdlib);
     // undefine and delete parsers
     mpc_cleanup(9, Float, Int, Symbol, String, Comment, Sexpr, Qexpr, Expr, Slither);

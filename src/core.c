@@ -100,6 +100,7 @@ struct lval {
     char* err;
     char* sym;
     char* str;
+    char* ctx;
 
     // Function
     lbuiltin builtin;
@@ -1175,31 +1176,20 @@ lval* builtin_lambda(lenv* e, lval* a) {
 }
 
 lval* builtin_var(lenv* e, lval* a, char* func) {
-    LASSERT_TYPE(func, a, 0, LVAL_QEXPR);
+    LASSERT_TYPE(func, a, 0, LVAL_SYM);
 
-    lval* syms = a->cell[0];
-    for (int i = 0; i < syms->count; i++) {
-        LASSERT(a, (syms->cell[i]->type == LVAL_SYM),
-                "Function '%s' cannot define non-symbol. "
-                "Got %s, Expected %s.", func,
-                ltype_name(syms->cell[i]->type),
-                ltype_name(LVAL_SYM));
-    }
+    lval* sym = a;
+    sym->ctx = "def";
 
-    LASSERT(a, (syms->count == a->count-1),
-            "Function '%s' passed too many arguments for symbols. "
-            "Got %i, Expected %i.", func, syms->count, a->count-1);
-
-    for (int i = 0; i < syms->count; i++) {
         // if 'def' define in globally. If 'put' define in locally
         if (strcmp(func, "def") == 0) {
-            lenv_def(e, syms->cell[i], a->cell[i+1]);
+            lenv_def(e, sym, a);
         }
 
+        // TODO: change '=' to 'let' ?
         if (strcmp(func, "=") == 0) {
-            lenv_put(e, syms->cell[i], a->cell[i+1]);
+            lenv_put(e, sym, a);
         }
-    }
 
     lval_del(a);
     return lval_sexpr();
@@ -1402,11 +1392,11 @@ lval* lval_eval_sexpr(lenv* e, lval* v) {
 }
 
 lval* lval_eval(lenv* e, lval* v) {
-    if (v->type == LVAL_SYM) {
+    if (v->type == LVAL_SYM && strcmp(v->ctx, "def") == 1) {
             lval* x = lenv_get(e, v);
             lval_del(v);
             return x;
-        }
+    }
     // evaluate sexprs
     if (v->type == LVAL_SEXPR) { return lval_eval_sexpr(e, v); }
     // all other lval types remain the same
